@@ -265,6 +265,8 @@ const GenericBillPage: React.FC<GenericBillPageProps> = ({ category, icon }) => 
                     onClose={() => setIsAddModalOpen(false)}
                     onBillAdded={handleBillAdded}
                     preselectedCategory={category}
+                    availableMonths={availableMonths}
+                    selectedMonth={selectedMonth}
                 />
             )}
 

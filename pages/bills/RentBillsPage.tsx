@@ -123,14 +123,16 @@ const RentBillsPage: React.FC = () => {
         setEditingRentBill(null);
     };
 
-    const handleConfirmPush = (rentData: { userId: string; userName: string; amount: number }[]) => {
+    const handleConfirmPush = (data: { rentData: { userId: string; userName: string; amount: number }[], month: string; dueDate: string; }) => {
+        const { rentData, month, dueDate } = data;
+        
         const newBills: Bill[] = rentData.map((rent) => ({
-            id: `rent-nov-${rent.userId}`,
+            id: `rent-${month.toLowerCase().split(' ')[0]}-${rent.userId}`,
             khataId: user!.khataId!,
-            title: 'November Rent',
+            title: `${month} Rent`,
             category: 'Rent',
             totalAmount: rent.amount,
-            dueDate: '2025-11-01',
+            dueDate: dueDate,
             createdBy: user!.id,
             shares: [{
                 userId: rent.userId,
@@ -141,7 +143,7 @@ const RentBillsPage: React.FC = () => {
         }));
     
         setRentBills(prev => [...newBills, ...prev]);
-        addToast({ type: 'success', title: 'Bills Created', message: 'November rent bills have been pushed to all members.' });
+        addToast({ type: 'success', title: 'Bills Created', message: `${month} rent bills have been pushed to all members.` });
     };
 
     if (loading) return <div className="text-center p-8">Loading rent bills...</div>;

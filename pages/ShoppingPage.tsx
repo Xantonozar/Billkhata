@@ -119,7 +119,7 @@ const EditRosterModal: React.FC<EditRosterModalProps> = ({ onClose, roster, onSa
 };
 
 
-const DepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({ onClose, onSubmit }) => {
+const AddDepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({ onClose, onSubmit }) => {
     const [amount, setAmount] = useState('1500');
     const [method, setMethod] = useState('bKash');
 
@@ -154,7 +154,7 @@ const DepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({
                         </div>
                     </div>
                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction ID:</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction ID (optional):</label>
                         <input type="text" placeholder="TRX12345678" className="w-full mt-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors" />
                     </div>
                      <div>
@@ -170,6 +170,55 @@ const DepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({
         </div>
     )
 }
+
+const AddExpenseModal: React.FC<{ onClose: () => void; onSubmit: () => void }> = ({ onClose, onSubmit }) => {
+    const [amount, setAmount] = useState('');
+    const [items, setItems] = useState('');
+    const [notes, setNotes] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit();
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 animate-fade-in p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Add Shopping Expense</h3>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-5 h-5"/></button>
+                </div>
+                <form className="space-y-4" onSubmit={handleSubmit}>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount:</label>
+                        <div className="relative mt-1">
+                            <span className="absolute inset-y-0 left-3 flex items-center text-gray-500">৳</span>
+                            <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full pl-8 pr-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors" required />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Items Purchased:</label>
+                        <textarea value={items} onChange={e => setItems(e.target.value)} rows={3} placeholder="e.g., Rice (5kg), Vegetables, Oil (1L)" className="w-full mt-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors" required />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Notes (optional):</label>
+                        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full mt-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Receipt (optional):</label>
+                        <div className="flex gap-2 mt-1">
+                            <button type="button" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"><CameraIcon className="w-5 h-5"/>Take Photo</button>
+                            <button type="button" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"><FolderIcon className="w-5 h-5"/>Gallery</button>
+                        </div>
+                    </div>
+                    <button type="submit" className="w-full mt-2 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Submit for Approval</button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
 
 // --- VIEWS ---
 
@@ -281,9 +330,29 @@ const ManagerShoppingView: React.FC = () => {
 };
 
 const MemberShoppingView: React.FC = () => {
+    const { user } = useAuth();
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const { addToast } = useNotifications();
+    const [historyTab, setHistoryTab] = useState<'deposits' | 'expenses'>('deposits');
     
+    // Mock today is Wednesday, Oct 8, 2025.
+    const todayDay = 'Wednesday';
+    const myName = user?.name || ''; 
+
+    const myDutyToday = mockShoppingDutyData[todayDay]?.name === myName;
+    
+    const nextDutyDay = Object.entries(mockShoppingDutyData).find(([day, duty]) => {
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        return duty.name === myName && dayOrder.indexOf(day) > dayOrder.indexOf(todayDay);
+    });
+
+    const dutyText = myDutyToday 
+        ? "Today is your shopping day! 🛒" 
+        : nextDutyDay 
+        ? `Your next shopping duty is on ${nextDutyDay[0]}.` 
+        : "You have no upcoming shopping duties this week.";
+
     const handleDepositSubmit = () => {
         addToast({ type: 'success', title: 'Deposit Submitted', message: 'Your deposit is now pending manager approval.' });
     };
@@ -294,51 +363,65 @@ const MemberShoppingView: React.FC = () => {
 
     return (
         <>
-        <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                 <h3 className="font-semibold text-lg mb-3">Your Fund Summary</h3>
-                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
-                    <p>Total Deposits: <span className="font-bold text-lg float-right">৳{mockMemberSummary.totalDeposits}</span></p>
-                    <p>Your Meal Cost: <span className="font-bold text-lg float-right">৳{mockMemberSummary.mealCost}</span></p>
-                    <p className="text-green-600 dark:text-green-300 font-semibold">Refundable: <span className="font-bold text-lg float-right">+৳{mockMemberSummary.refundable}</span></p>
-                 </div>
-                 <button onClick={() => setIsDepositModalOpen(true)} className="w-full mt-4 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Deposit Money</button>
+            <div className="space-y-6">
+                <div className="bg-primary-50 dark:bg-primary-500/10 p-4 rounded-lg text-center">
+                    <p className="font-semibold text-primary-700 dark:text-primary-300">{dutyText}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => setIsDepositModalOpen(true)} className="py-4 text-center bg-white dark:bg-slate-800 rounded-xl shadow-md font-semibold text-slate-700 dark:text-slate-200 hover:scale-105 transition-transform active:scale-95">
+                        💰 Add Deposit
+                    </button>
+                    <button onClick={() => setIsExpenseModalOpen(true)} className="py-4 text-center bg-white dark:bg-slate-800 rounded-xl shadow-md font-semibold text-slate-700 dark:text-slate-200 hover:scale-105 transition-transform active:scale-95">
+                        🛒 Add Expense
+                    </button>
+                </div>
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 grid grid-cols-2 divide-x dark:divide-slate-700 text-center">
+                    <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Deposit Balance</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white font-numeric">৳{mockMemberSummary.totalDeposits.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Due / Refund</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400 font-numeric">+৳{mockMemberSummary.refundable.toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md">
+                    <div className="p-4 border-b dark:border-slate-700">
+                        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                            <button onClick={() => setHistoryTab('deposits')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-colors ${historyTab === 'deposits' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>
+                                Deposit History
+                            </button>
+                             <button onClick={() => setHistoryTab('expenses')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-colors ${historyTab === 'expenses' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>
+                                Expense History
+                            </button>
+                        </div>
+                    </div>
+                    <div className="p-4 space-y-2">
+                        {historyTab === 'deposits' && (
+                            mockDepositHistory.map(d => (
+                                <div key={d.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                                    <span>{d.date} - {d.method}</span>
+                                    <span className="font-semibold flex items-center gap-1">৳{d.amount.toLocaleString()} <CheckCircleIcon className="w-4 h-4 text-green-500"/></span>
+                                </div>
+                            ))
+                        )}
+                         {historyTab === 'expenses' && (
+                             mockShoppingHistory.map(s => (
+                                <div key={s.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                                    <span>{s.date}</span>
+                                    <span className={`font-semibold ${s.status === 'Approved' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                        ৳{s.amount.toLocaleString()} {s.status === 'Approved' ? '✅ Approved' : '⏳ Pending'}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                        <button className="text-sm font-semibold text-primary hover:underline mt-2 w-full text-center p-2">View All →</button>
+                    </div>
+                </div>
             </div>
             
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                <h3 className="font-semibold text-lg mb-3">Your Deposit History</h3>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                    <ul className="space-y-2">
-                        {mockDepositHistory.map(d => (
-                             <li key={d.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                <span>{d.date} - {d.method}</span>
-                                <span className="font-semibold flex items-center gap-1">৳{d.amount} <CheckCircleIcon className="w-4 h-4 text-green-500"/></span>
-                            </li>
-                        ))}
-                    </ul>
-                    <button className="text-sm font-semibold text-primary hover:underline mt-3">View All →</button>
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                <h3 className="font-semibold text-lg mb-3">🛒 Your Shopping Duties</h3>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                     <ul className="space-y-2">
-                        {mockShoppingHistory.map(s => (
-                             <li key={s.id} className="flex justify-between items-center text-sm p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                                <span>{s.date}</span>
-                                <span className={`font-semibold ${s.status === 'Approved' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                                    ৳{s.amount} {s.status === 'Approved' ? '✅ Approved' : '⏳ Pending'}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">Next Duty: <span className="font-semibold">Oct 25</span></p>
-                    <button onClick={handleExpenseSubmit} className="w-full mt-3 py-2 border-2 border-primary text-primary font-semibold rounded-lg hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors">Submit Shopping Expense</button>
-                </div>
-            </div>
-        </div>
-        {isDepositModalOpen && <DepositModal onClose={() => setIsDepositModalOpen(false)} onSubmit={handleDepositSubmit} />}
+            {isDepositModalOpen && <AddDepositModal onClose={() => setIsDepositModalOpen(false)} onSubmit={handleDepositSubmit} />}
+            {isExpenseModalOpen && <AddExpenseModal onClose={() => setIsExpenseModalOpen(false)} onSubmit={handleExpenseSubmit} />}
         </>
     );
 };
@@ -357,7 +440,7 @@ const ShoppingPage: React.FC = () => {
                         <ArrowLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-300"/>
                     </button>
                     <ShoppingCartIcon className="w-8 h-8 text-primary" />
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Shopping</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Shopping & Funds</h1>
                 </div>
                  {user.role === Role.Manager && (
                     <button className="px-4 py-2 text-sm bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Assign Duty</button>

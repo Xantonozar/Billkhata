@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Bill, BillShare, Role } from '../../types';
 import { XIcon, CameraIcon } from '../Icons';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -19,14 +19,15 @@ interface AddBillModalProps {
     onClose: () => void;
     onBillAdded: (newBill: Bill) => void;
     preselectedCategory?: string;
+    availableMonths?: string[];
+    selectedMonth?: string;
 }
 
-const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, preselectedCategory }) => {
+const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, preselectedCategory, availableMonths, selectedMonth }) => {
     const { user } = useAuth();
     const [title, setTitle] = useState('');
     const [category, setCategory] = useState(preselectedCategory || 'Electricity');
     const [totalAmount, setTotalAmount] = useState<number | ''>('');
-    const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
     const [description, setDescription] = useState('');
     const [splitType, setSplitType] = useState<'equally' | 'custom'>('equally');
     
@@ -36,6 +37,36 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
     const [selectedMembers, setSelectedMembers] = useState<string[]>(membersToDisplay.map(m => m.id));
     const [customAmounts, setCustomAmounts] = useState<Record<string, number>>({});
     const { addToast } = useNotifications();
+
+    const getInitialDateForMonth = (monthString?: string) => {
+        if (monthString) {
+            try {
+                const [monthStr, yearStr] = monthString.split(' ');
+                const year = parseInt(yearStr, 10);
+                const monthIndex = new Date(Date.parse(monthStr +" 1, 2012")).getMonth();
+                const defaultDate = new Date(year, monthIndex, 1);
+                return defaultDate.toISOString().split('T')[0];
+            } catch (e) {
+                 return new Date().toISOString().split('T')[0];
+            }
+        }
+        return new Date().toISOString().split('T')[0];
+    };
+
+    const [currentMonth, setCurrentMonth] = useState(selectedMonth || (availableMonths ? availableMonths[0] : ''));
+    const [dueDate, setDueDate] = useState(getInitialDateForMonth(selectedMonth));
+
+    const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const newMonth = e.target.value;
+        setCurrentMonth(newMonth);
+
+        const [monthStr, yearStr] = newMonth.split(' ');
+        const year = parseInt(yearStr, 10);
+        const monthIndex = new Date(Date.parse(monthStr + " 1, 2012")).getMonth();
+        
+        const newDate = new Date(year, monthIndex, 1);
+        setDueDate(newDate.toISOString().split('T')[0]);
+    };
 
     const handleMemberToggle = (memberId: string) => {
         const newSelected = selectedMembers.includes(memberId)
@@ -155,7 +186,7 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
                 
                 <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 text-sm">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Title</label>
                             <input type="text" placeholder="e.g., October Electricity" value={title} onChange={e => setTitle(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required/>
                         </div>
@@ -165,6 +196,14 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
                                  {['Electricity', 'Water', 'Gas', 'Wi-Fi', 'Maid', 'Others'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
                             </select>
                         </div>
+                        {availableMonths && availableMonths.length > 0 && (
+                            <div>
+                                <label className="font-semibold text-slate-700 dark:text-slate-300">Month</label>
+                                <select value={currentMonth} onChange={handleMonthChange} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required>
+                                    {availableMonths.map(month => <option key={month} value={month}>{month}</option>)}
+                                </select>
+                            </div>
+                        )}
                         <div>
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Total Amount</label>
                             <input type="number" step="0.01" value={totalAmount} onChange={e => setTotalAmount(parseFloat(e.target.value) || '')} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required/>
