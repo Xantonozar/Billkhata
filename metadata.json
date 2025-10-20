@@ -1,0 +1,5 @@
+{
+  "name": "Copy of BillKhata",
+  "description": "A comprehensive mess management application for shared living spaces, featuring role-based access for managers and members to handle bills, meals, and finances. Built with React, TypeScript, and Tailwind CSS, following a detailed phase-by-phase development plan.",
+  "requestFramePermissions": []
+}
