@@ -9,28 +9,28 @@ import {
 // --- MOCK DATA ---
 const mockMembers = [
     { 
-        id: '1', name: 'Raj Kumar', role: Role.Manager, phone: '+880 1712-345678', whatsapp: '+880 1712-345678', facebook: 'fb.com/rajkumar', 
-        joined: 'Sept 1, 2025', room: 'Corner (Attached bath)', 
-        thisMonth: { billsDue: '₹1,587.50', meals: 28, status: '⚠️ 1 Overdue' },
-        paymentPunctuality: 50,
-        shoppingContributions: { count: 5, total: 2450 }
+        id: '1', name: 'Alice Manager', role: Role.Manager, phone: '+8801700000000', whatsapp: '+8801700000000', facebook: 'Not added', 
+        joined: 'Sept 1, 2025', room: 'Admin', 
+        thisMonth: { billsDue: 'N/A', meals: 0, status: 'N/A' },
+        paymentPunctuality: 100,
+        shoppingContributions: { count: 0, total: 0 }
     },
     { 
-        id: '2', name: 'Amit Hossain', role: Role.Member, phone: '+880 1812-987654', whatsapp: 'Available', facebook: 'Not added', 
+        id: '9', name: 'Amit Hossain', role: Role.Member, phone: '+8801812987654', whatsapp: '+8801812987654', facebook: 'Not added', 
         joined: 'Sept 1, 2025', room: 'Front room',
         thisMonth: { billsDue: '₹1,200', meals: 25, status: '✅ All paid' },
         paymentPunctuality: 100,
         shoppingContributions: { count: 5, total: 2450 }
     },
     { 
-        id: '3', name: 'Priya Das', role: Role.Member, phone: '+880 1912-111222', whatsapp: 'Available', facebook: 'fb.com/priyadas', 
+        id: '3', name: 'Priya Das', role: Role.Member, phone: '+8801912111222', whatsapp: '+8801912111222', facebook: 'fb.com/priyadas', 
         joined: 'Sept 5, 2025', room: 'Middle room',
         thisMonth: { billsDue: '₹587.50', meals: 30, status: '⏳ 1 Pending' },
         paymentPunctuality: 75,
         shoppingContributions: { count: 3, total: 1500 }
     },
     { 
-        id: '4', name: 'Ravi Islam', role: Role.Member, phone: '+880 1612-333444', whatsapp: 'Not available', facebook: 'Not added', 
+        id: '4', name: 'Ravi Islam', role: Role.Member, phone: '+8801612333444', whatsapp: 'Not available', facebook: 'Not added', 
         joined: 'Sept 10, 2025', room: 'Side room',
         thisMonth: { billsDue: '₹0', meals: 22, status: '✅ All paid' },
         paymentPunctuality: 100,
@@ -118,6 +118,20 @@ const MemberCard: React.FC<{ member: typeof mockMembers[0], onHistoryClick: () =
     const { user } = useAuth();
     const isManager = member.role === Role.Manager;
 
+    const handleWhatsApp = () => {
+        if (member.whatsapp && member.whatsapp !== 'Available' && member.whatsapp !== 'Not available') {
+            const phoneNumber = member.whatsapp.replace(/[^0-9]/g, '');
+            window.open(`https://wa.me/${phoneNumber}`, '_blank');
+        }
+    };
+
+    const handleCall = () => {
+        if (member.phone) {
+            const phoneNumber = member.phone.replace(/[^0-9+]/g, '');
+            window.open(`tel:${phoneNumber}`);
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
             <div className="flex items-center gap-4">
@@ -158,14 +172,13 @@ const MemberCard: React.FC<{ member: typeof mockMembers[0], onHistoryClick: () =
                 {user?.role === Role.Manager && member.id !== user.id ? (
                     <>
                         <button onClick={onHistoryClick} className="text-primary hover:underline">View History</button>
-                        <button className="text-primary hover:underline">Edit Info</button>
                         <button className="text-red-500 hover:underline">Remove</button>
                     </>
                 ) : (
                     <>
-                         <button className="flex-1 px-3 py-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-md">💬 WhatsApp</button>
-                         <button className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-md">📞 Call</button>
-                         <button onClick={onHistoryClick} className="w-full text-left mt-1 text-primary hover:underline">View Full History →</button>
+                         <button onClick={handleWhatsApp} className="flex-1 px-3 py-2 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 rounded-md flex items-center justify-center gap-2 transition-colors hover:bg-green-200 dark:hover:bg-green-900"><WhatsAppIcon className="w-4 h-4"/> WhatsApp</button>
+                         <button onClick={handleCall} className="flex-1 px-3 py-2 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-md flex items-center justify-center gap-2 transition-colors hover:bg-blue-200 dark:hover:bg-blue-900"><PhoneIcon className="w-4 h-4"/> Call</button>
+                         <button onClick={onHistoryClick} className="w-full text-left mt-1 text-primary hover:underline p-1">View Full History →</button>
                     </>
                 )}
              </div>

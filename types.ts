@@ -29,6 +29,7 @@ export interface BillShare {
 
 export interface Bill {
   id: string;
+  khataId: string;
   title: string;
   totalAmount: number;
   dueDate: string;
@@ -49,4 +50,10 @@ export interface JoinRequest {
     userEmail: string;
     // FIX: Changed type from invalid 'a-zA-Z' to 'string'.
     requestedAt: string;
+}
+
+export interface TodaysMenu {
+  breakfast: string;
+  lunch: string;
+  dinner: string;
 }

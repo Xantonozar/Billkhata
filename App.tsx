@@ -21,6 +21,8 @@ import PendingApprovalsPage from './pages/PendingApprovalsPage';
 import ReportsAnalyticsPage from './pages/ReportsAnalyticsPage';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ToastContainer from './components/ToastContainer';
+import CalendarPage from './pages/CalendarPage';
+import MenuPage from './pages/MenuPage';
 
 const AppContent: React.FC = () => {
   const { user, page, setPage } = useAuth();
@@ -45,6 +47,8 @@ const AppContent: React.FC = () => {
         {page.startsWith('bills') && <BillsPage />}
         {page === 'meals' && <MealManagementPage />}
         {page === 'shopping' && <ShoppingPage />}
+        {page === 'calendar' && <CalendarPage />}
+        {page === 'menu' && <MenuPage />}
         {page === 'members' && <RoomMembersPage />}
         {page === 'history' && <HistoryPage />}
         {page === 'reports-analytics' && <ReportsAnalyticsPage />}

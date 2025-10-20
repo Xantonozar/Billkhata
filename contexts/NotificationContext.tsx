@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import type { Page } from './AuthContext';
 
 export type ToastType = 'success' | 'warning' | 'error';
 export interface Toast {
@@ -17,17 +18,18 @@ export interface Notification {
     actionText?: string;
     timestamp: string;
     read: boolean;
+    link?: Page;
 }
 
 // MOCK DATA
 const mockNotifications: Notification[] = [
-    { id: 1, type: 'bill', title: 'New Bill Assigned', message: 'Electricity bill (₹300) - Due: Oct 15', actionText: 'View Bill', timestamp: '2 hours ago', read: false },
-    { id: 2, type: 'payment', title: 'Payment Approved', message: 'Your Rent payment (₹5,000) has been approved by the manager.', timestamp: '5 hours ago', read: true },
-    { id: 3, type: 'meal', title: 'Meal Reminder', message: "Don't forget to log today's meals.", actionText: 'Log Now', timestamp: '6 hours ago', read: false },
-    { id: 4, type: 'room', title: 'Member Joined', message: 'Amit Hossain has joined the room.', timestamp: '1 day ago', read: true },
-    { id: 5, type: 'payment', title: 'Payment Reminder', message: 'Your Electricity bill is due in 3 days.', timestamp: '2 days ago', read: false },
-    { id: 6, type: 'bill', title: 'Bill Overdue', message: 'Your Rent bill is overdue by 7 days.', timestamp: '7 days ago', read: false },
-    { id: 7, type: 'meal', title: 'Shopping Approved', message: 'Your shopping expense of ₹850 has been approved.', timestamp: '8 days ago', read: false },
+    { id: 1, type: 'bill', title: 'New Bill Assigned', message: 'Electricity bill (₹300) - Due: Oct 15', actionText: 'View Bill', timestamp: '2 hours ago', read: false, link: 'bills-electricity' },
+    { id: 2, type: 'payment', title: 'Payment Approved', message: 'Your Rent payment (₹5,000) has been approved by the manager.', timestamp: '5 hours ago', read: true, link: 'bills-rent' },
+    { id: 3, type: 'meal', title: 'Meal Reminder', message: "Don't forget to log today's meals.", actionText: 'Log Now', timestamp: '6 hours ago', read: false, link: 'meals' },
+    { id: 4, type: 'room', title: 'Member Joined', message: 'Amit Hossain has joined the room.', timestamp: '1 day ago', read: true, link: 'members' },
+    { id: 5, type: 'payment', title: 'Payment Reminder', message: 'Your Electricity bill is due in 3 days.', timestamp: '2 days ago', read: false, link: 'bills-electricity' },
+    { id: 6, type: 'bill', title: 'Bill Overdue', message: 'Your Rent bill is overdue by 7 days.', timestamp: '7 days ago', read: false, link: 'bills-rent' },
+    { id: 7, type: 'meal', title: 'Shopping Approved', message: 'Your shopping expense of ₹850 has been approved.', timestamp: '8 days ago', read: false, link: 'shopping' },
 ];
 
 

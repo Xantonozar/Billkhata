@@ -7,7 +7,7 @@ export type Page =
   'landing' | 'login' | 'signup' | 
   'dashboard' | 
   'bills' | 'bills-all' | 'bills-rent' | 'bills-electricity' | 'bills-water' | 'bills-gas' | 'bills-wifi' | 'bills-maid' | 'bills-others' |
-  'meals' | 'shopping' | 
+  'meals' | 'shopping' | 'calendar' | 'menu' |
   'members' | 'history' | 'reports-analytics' | 'payment-dashboard' | 'pending-approvals' | 'settings';
 
 interface AuthContextType {
@@ -68,8 +68,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary"></div>
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-900">
+            <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary-500"></div>
         </div>
     );
   }

@@ -1,17 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Role } from '../types';
 import { MealIcon, ArrowLeftIcon, BellIcon, XIcon } from '../components/Icons';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const COST_PER_QUANTITY = 45.50;
 
 // MOCK DATA based on wireframes
-const mockManagerEdit = {
-    date: 'Oct 7',
-    change: 'dinner from 2 to 0',
-    reason: 'You were out',
-};
-
 const mockMemberMonthSummary = {
     totalQuantities: 56,
     totalCost: 2548,
@@ -20,11 +15,24 @@ const mockMemberMonthSummary = {
 };
 
 const mockManagerMealList = [
-    { id: '1', name: 'Raj Kumar', meals: { breakfast: 2, lunch: 2, dinner: 2 } },
-    { id: '2', name: 'Amit Hossain', meals: { breakfast: 1, lunch: 0, dinner: 1 } },
+    { id: '9', name: 'Amit Hossain', meals: { breakfast: 1, lunch: 0, dinner: 1 } },
     { id: '3', name: 'Priya Das', meals: { breakfast: 2, lunch: 2, dinner: 0 } },
     { id: '4', name: 'Ravi Islam', meals: { breakfast: 1, lunch: 1, dinner: 1 } },
 ];
+
+interface MealSet {
+    breakfast: number;
+    lunch: number;
+    dinner: number;
+}
+
+interface PendingEditRequest {
+    date: string;
+    memberName: string;
+    originalMeals: MealSet;
+    newMeals: MealSet;
+    reason: string;
+}
 
 // --- Sub-components ---
 
@@ -56,13 +64,44 @@ const MealQuantitySelector: React.FC<{
                 </button>
             ))}
         </div>
-        {note && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">({note})</p>}
+        {note && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{note}</p>}
     </div>
 );
 
-const ManagerEditModal: React.FC<{ memberName: string; onClose: () => void }> = ({ memberName, onClose }) => {
-    const [reason, setReason] = useState('He was out for dinner');
-    const [meals, setMeals] = useState({ breakfast: 2, lunch: 2, dinner: 0 }); // Pre-fill with member's data if available
+const ManagerEditModal: React.FC<{
+    memberName: string;
+    memberList: typeof mockManagerMealList;
+    onClose: () => void;
+    onSubmit: (edit: {
+        memberName: string;
+        newMeals: MealSet;
+        originalMeals: MealSet;
+        reason: string;
+    }) => void;
+    isFinalized: boolean;
+}> = ({ memberName, memberList, onClose, onSubmit, isFinalized }) => {
+    const originalMemberData = useMemo(() => memberList.find(m => m.name === memberName), [memberName, memberList]);
+    const originalMeals = useMemo(() => originalMemberData?.meals || { breakfast: 2, lunch: 2, dinner: 2 }, [originalMemberData]);
+    
+    const [meals, setMeals] = useState<MealSet>(originalMeals);
+    const [reason, setReason] = useState(isFinalized ? 'Was out of town' : '');
+
+    const handleSubmit = () => {
+        onSubmit({
+            memberName: memberName,
+            newMeals: meals,
+            originalMeals: originalMeals,
+            reason: reason,
+        });
+        onClose();
+    };
+    
+    const getChangeNote = (meal: keyof typeof meals) => {
+        if (meals[meal] !== originalMeals[meal]) {
+            return `(Changing from ${originalMeals[meal]} to ${meals[meal]})`;
+        }
+        return undefined;
+    }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 animate-fade-in p-4">
@@ -74,24 +113,29 @@ const ManagerEditModal: React.FC<{ memberName: string; onClose: () => void }> = 
                 <div className="border-t my-4 border-gray-200 dark:border-gray-700"></div>
                 
                 <div className="space-y-4">
-                    <p className="p-2 text-sm text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900/50 rounded-md text-center">⚠️ Already finalized. Changes need member approval.</p>
-                    <MealQuantitySelector meal="breakfast" icon="🌅" label="Breakfast" value={meals.breakfast} onChange={(v) => setMeals(p => ({...p, breakfast: v}))} disabled={false} />
-                    <MealQuantitySelector meal="lunch" icon="🌞" label="Lunch" value={meals.lunch} onChange={(v) => setMeals(p => ({...p, lunch: v}))} disabled={false} />
-                    <MealQuantitySelector meal="dinner" icon="🌙" label="Dinner" value={meals.dinner} onChange={(v) => setMeals(p => ({...p, dinner: v}))} disabled={false} note="Changing from 2 to 0"/>
-                    <div>
-                        <label className="font-semibold text-gray-800 dark:text-white text-sm">Reason for Change:</label>
-                        <input 
-                            type="text" 
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            className="w-full mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors"
-                        />
-                    </div>
+                    {isFinalized && <p className="p-2 text-sm text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900/50 rounded-md text-center">⚠️ Already finalized. Changes need member approval.</p>}
+                    <MealQuantitySelector meal="breakfast" icon="🌅" label="Breakfast" value={meals.breakfast} onChange={(v) => setMeals(p => ({...p, breakfast: v}))} disabled={false} note={getChangeNote('breakfast')} />
+                    <MealQuantitySelector meal="lunch" icon="🌞" label="Lunch" value={meals.lunch} onChange={(v) => setMeals(p => ({...p, lunch: v}))} disabled={false} note={getChangeNote('lunch')} />
+                    <MealQuantitySelector meal="dinner" icon="🌙" label="Dinner" value={meals.dinner} onChange={(v) => setMeals(p => ({...p, dinner: v}))} disabled={false} note={getChangeNote('dinner')} />
+                    
+                    {isFinalized && (
+                        <div>
+                            <label className="font-semibold text-gray-800 dark:text-white text-sm">Reason for Change:</label>
+                            <input 
+                                type="text" 
+                                value={reason}
+                                onChange={(e) => setReason(e.target.value)}
+                                className="w-full mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex gap-3 mt-6">
                     <button onClick={onClose} className="flex-1 py-2.5 bg-gray-200 dark:bg-gray-600 font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">Cancel</button>
-                    <button onClick={onClose} className="flex-1 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600 transition-colors">Send for Approval</button>
+                    <button onClick={handleSubmit} className="flex-1 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600 transition-colors">
+                        {isFinalized ? 'Send for Approval' : 'Save Changes'}
+                    </button>
                 </div>
             </div>
         </div>
@@ -100,12 +144,39 @@ const ManagerEditModal: React.FC<{ memberName: string; onClose: () => void }> = 
 
 // --- Views ---
 
-const MemberMealView: React.FC = () => {
-    // This state simulates the manager's action. In a real app, this would come from an API.
-    const [isFinalized, setIsFinalized] = useState(false); 
-    const [meals, setMeals] = useState({ breakfast: 2, lunch: 2, dinner: 0 }); // Initial state from wireframe
+const ChangeSummary: React.FC<{ pendingEdit: PendingEditRequest }> = ({ pendingEdit }) => {
+    const changes: string[] = [];
+    (Object.keys(pendingEdit.newMeals) as Array<keyof MealSet>).forEach(meal => {
+        if (pendingEdit.newMeals[meal] !== pendingEdit.originalMeals[meal]) {
+            changes.push(`${meal} from ${pendingEdit.originalMeals[meal]} to ${pendingEdit.newMeals[meal]}`);
+        }
+    });
+
+    if (changes.length === 0) return null;
+
+    return (
+        <p className="text-sm font-medium">
+            Manager changed meals for Oct {pendingEdit.date}: {changes.join(', ')}.
+        </p>
+    );
+};
+
+interface MemberMealViewProps {
+    isFinalized: boolean;
+    meals: MealSet;
+    setMeals: React.Dispatch<React.SetStateAction<MealSet>>;
+    pendingEdit: PendingEditRequest | null;
+    onApprovalAction: (action: 'approve' | 'deny') => void;
+}
+
+const MemberMealView: React.FC<MemberMealViewProps> = ({ isFinalized, meals, setMeals, pendingEdit, onApprovalAction }) => {
+    const { addToast } = useNotifications();
     const totalQty = meals.breakfast + meals.lunch + meals.dinner;
     const totalCost = totalQty * COST_PER_QUANTITY;
+    
+    const handleSaveChanges = () => {
+        addToast({ type: 'success', title: 'Meals Updated', message: 'Your meal plan for today has been saved.' });
+    };
 
     return (
         <div className="space-y-6">
@@ -138,24 +209,25 @@ const MemberMealView: React.FC = () => {
                             <p>Total Today: {totalQty} quantities</p>
                             <p>Cost: ৳{totalCost.toFixed(2)} (@ ৳{COST_PER_QUANTITY.toFixed(2)}/quantity)</p>
                         </div>
-                        {/* Mock "Save Changes" to toggle to the finalized view for demo */}
-                        <button onClick={() => alert('Changes saved!')} className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Changes</button>
+                        <button onClick={handleSaveChanges} className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Changes</button>
                     </div>
                 )}
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                <h3 className="text-lg font-semibold mb-2 text-yellow-600 dark:text-yellow-400">🔔 Manager Edit Pending Approval</h3>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-3"></div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <p className="text-sm font-medium">Oct 7 - Manager changed your dinner from 2 to 0</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Reason: "{mockManagerEdit.reason}"</p>
-                    <div className="flex gap-2 mt-3 justify-end">
-                        <button className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                        <button className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve Change</button>
+            {pendingEdit && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                    <h3 className="text-lg font-semibold mb-2 text-yellow-600 dark:text-yellow-400">🔔 Manager Edit Pending Approval</h3>
+                    <div className="border-t border-gray-200 dark:border-gray-700 my-3"></div>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                        <ChangeSummary pendingEdit={pendingEdit} />
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Reason: "{pendingEdit.reason}"</p>
+                        <div className="flex gap-2 mt-3 justify-end">
+                            <button onClick={() => onApprovalAction('deny')} className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
+                            <button onClick={() => onApprovalAction('approve')} className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve Change</button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold mb-2">This Month Summary</h3>
@@ -171,13 +243,17 @@ const MemberMealView: React.FC = () => {
     );
 };
 
-const ManagerMealView: React.FC = () => {
-    const [isFinalized, setIsFinalized] = useState(false);
-    const [isEditingMember, setIsEditingMember] = useState<string | null>(null);
-    const totalQuantities = mockManagerMealList.reduce((acc, m) => acc + m.meals.breakfast + m.meals.lunch + m.meals.dinner, 0);
+interface ManagerMealViewProps {
+    isFinalized: boolean;
+    onFinalize: () => void;
+    setIsEditingMember: (name: string | null) => void;
+    memberList: typeof mockManagerMealList;
+}
+
+const ManagerMealView: React.FC<ManagerMealViewProps> = ({ isFinalized, onFinalize, setIsEditingMember, memberList }) => {
+    const totalQuantities = memberList.reduce((acc, m) => acc + m.meals.breakfast + m.meals.lunch + m.meals.dinner, 0);
 
     return (
-        <>
         <div className="space-y-6">
              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                 <h3 className="text-lg font-semibold mb-2">📅 Today - October 8, 2025</h3>
@@ -187,7 +263,7 @@ const ManagerMealView: React.FC = () => {
                 </p>
                 {!isFinalized && (
                     <>
-                    <button onClick={() => setIsFinalized(true)} className="mt-3 w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">📋 Finalize Today's Meals</button>
+                    <button onClick={onFinalize} className="mt-3 w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">📋 Finalize Today's Meals</button>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">(After this, members can't change)</p>
                     </>
                 )}
@@ -197,29 +273,30 @@ const ManagerMealView: React.FC = () => {
                 <h3 className="text-lg font-semibold mb-2">📊 Today's Meal List</h3>
                 <div className="border-t border-gray-200 dark:border-gray-700 my-3"></div>
                 <div className="space-y-3">
-                    {mockManagerMealList.slice(0, 2).map(member => {
+                    {memberList.map(member => {
                         const total = member.meals.breakfast + member.meals.lunch + member.meals.dinner;
                         const cost = total * COST_PER_QUANTITY;
                         return (
                             <div key={member.id} className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                                 <p className="font-bold text-gray-800 dark:text-white">{member.name}</p>
                                 <div className="text-sm mt-1 text-gray-600 dark:text-gray-300">
-                                    <p>🌅 Breakfast: {member.meals.breakfast}</p>
-                                    <p>🌞 Lunch: {member.meals.lunch} {member.meals.lunch === 0 && '(Not having)'}</p>
-                                    <p>🌙 Dinner: {member.meals.dinner}</p>
+                                    <p>🌅 B: {member.meals.breakfast}, 🌞 L: {member.meals.lunch}, 🌙 D: {member.meals.dinner}</p>
                                 </div>
                                 <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
                                 <div className="flex justify-between items-center">
                                     <p className="text-sm font-semibold">Total: {total} • Cost: ৳{cost.toFixed(2)}</p>
                                     <div className="flex gap-2">
-                                        <button onClick={() => setIsEditingMember(member.name)} className="text-xs font-semibold text-primary hover:underline">Edit</button>
-                                        <button className="text-xs font-semibold text-primary hover:underline">View Profile</button>
+                                        <button 
+                                            onClick={() => setIsEditingMember(member.name)}
+                                            className="text-xs font-semibold text-primary hover:underline"
+                                        >
+                                            Edit
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         )
                     })}
-                    <button className="text-sm font-semibold text-primary hover:underline w-full text-left p-2">+ {mockManagerMealList.length - 2} more members...</button>
                 </div>
                 <div className="border-t border-gray-200 dark:border-gray-700 my-3"></div>
                  <div className="text-center font-semibold space-y-1">
@@ -228,8 +305,6 @@ const ManagerMealView: React.FC = () => {
                 </div>
             </div>
         </div>
-        {isEditingMember && <ManagerEditModal memberName={isEditingMember} onClose={() => setIsEditingMember(null)} />}
-        </>
     );
 }
 
@@ -237,27 +312,106 @@ const ManagerMealView: React.FC = () => {
 
 const MealManagementPage: React.FC = () => {
     const { user, setPage } = useAuth();
+    const { addToast } = useNotifications();
+    
+    // Shared state for manager-member interaction
+    const [isFinalized, setIsFinalized] = useState(false);
+    const [memberMeals, setMemberMeals] = useState<MealSet>({ breakfast: 2, lunch: 2, dinner: 2 });
+    const [pendingEdit, setPendingEdit] = useState<PendingEditRequest | null>(null);
+    const [isEditingMember, setIsEditingMember] = useState<string | null>(null);
+    const [managerMealList, setManagerMealList] = useState(mockManagerMealList);
+
     if (!user) return null;
 
+    const handleFinalize = () => {
+        setIsFinalized(true);
+        addToast({ type: 'success', title: 'Meals Finalized', message: "Today's meal counts are now locked." });
+    };
+
+    const handleManagerEditSubmit = (editData: { memberName: string; newMeals: MealSet; originalMeals: MealSet; reason: string; }) => {
+        const { memberName, newMeals, originalMeals, reason } = editData;
+    
+        if (isFinalized) {
+            const hasChanged = JSON.stringify(newMeals) !== JSON.stringify(originalMeals);
+            if (hasChanged) {
+                const editRequest: PendingEditRequest = {
+                    date: '8',
+                    memberName: memberName,
+                    originalMeals: originalMeals,
+                    newMeals: newMeals,
+                    reason: reason || 'Manager update',
+                };
+                setPendingEdit(editRequest);
+                addToast({ type: 'info', title: 'Request Sent', message: `Edit request sent to ${memberName}.` });
+            }
+        } else {
+            // Direct edit before finalization
+            setManagerMealList(prevList =>
+                prevList.map(member =>
+                    member.name === memberName ? { ...member, meals: newMeals } : member
+                )
+            );
+            addToast({ type: 'success', title: 'Meals Updated', message: `${memberName}'s meals have been updated directly.` });
+        }
+        setIsEditingMember(null); // Close modal
+    };
+
+    const handleMemberApprovalAction = (action: 'approve' | 'deny') => {
+        if (action === 'approve' && pendingEdit) {
+            setMemberMeals(pendingEdit.newMeals);
+            addToast({ type: 'success', title: 'Change Approved', message: 'Meal change has been applied.' });
+        } else {
+            addToast({ type: 'warning', title: 'Change Denied', message: 'The meal change was not applied.' });
+        }
+        setPendingEdit(null);
+    };
+
     return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setPage('dashboard')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 md:hidden">
-                        <ArrowLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-300"/>
-                    </button>
-                    <MealIcon className="w-8 h-8 text-primary" />
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Meal Management</h1>
+        <>
+            <div className="space-y-6 animate-fade-in">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setPage('dashboard')} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 md:hidden">
+                            <ArrowLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-300"/>
+                        </button>
+                        <MealIcon className="w-8 h-8 text-primary" />
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Meal Management</h1>
+                    </div>
+                    {user.role === Role.Member && (
+                        <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <BellIcon className="w-6 h-6"/>
+                        </button>
+                    )}
                 </div>
-                 {user.role === Role.Member && (
-                    <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <BellIcon className="w-6 h-6"/>
-                    </button>
+            
+                {user.role === Role.Manager ? (
+                    <ManagerMealView 
+                        isFinalized={isFinalized} 
+                        onFinalize={handleFinalize}
+                        setIsEditingMember={setIsEditingMember}
+                        memberList={managerMealList}
+                    />
+                ) : (
+                    <MemberMealView 
+                        isFinalized={isFinalized}
+                        meals={memberMeals}
+                        setMeals={setMemberMeals}
+                        pendingEdit={pendingEdit}
+                        onApprovalAction={handleMemberApprovalAction}
+                    />
                 )}
             </div>
-           
-            {user.role === Role.Manager ? <ManagerMealView /> : <MemberMealView />}
-        </div>
+
+            {user.role === Role.Manager && isEditingMember && (
+                <ManagerEditModal
+                    memberName={isEditingMember}
+                    memberList={managerMealList}
+                    onClose={() => setIsEditingMember(null)}
+                    onSubmit={handleManagerEditSubmit}
+                    isFinalized={isFinalized}
+                />
+            )}
+        </>
     );
 };
 

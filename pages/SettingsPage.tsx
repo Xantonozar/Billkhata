@@ -68,64 +68,79 @@ const RadioButton: React.FC<{ label: string; name: string; checked?: boolean }> 
 
 // --- TAB CONTENT COMPONENTS ---
 
-const ProfileTabContent: React.FC = () => (
-    <div className="space-y-6">
-        <SectionHeader title="Profile Settings" />
-        <div className="flex items-center gap-4">
-            <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                <UserCircleIcon className="w-16 h-16 text-gray-400" />
+const ProfileTabContent: React.FC = () => {
+    const { addToast } = useNotifications();
+    const handleSave = () => addToast({ type: 'success', title: 'Profile Saved', message: 'Your profile information has been updated.' });
+    const handleDelete = () => {
+        if (window.confirm('Are you sure you want to delete your account? This action is irreversible.')) {
+            addToast({ type: 'error', title: 'Account Deleted', message: 'Your account has been permanently deleted.' });
+            // Here you would call logout and redirect
+        }
+    };
+    return (
+        <div className="space-y-6">
+            <SectionHeader title="Profile Settings" />
+            <div className="flex items-center gap-4">
+                <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                    <UserCircleIcon className="w-16 h-16 text-gray-400" />
+                </div>
+                <button className="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500">📷 Change Photo</button>
             </div>
-            <button className="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500">📷 Change Photo</button>
+            <FormRow label="Full Name (Bangla/English):">
+                <TextInput value="রাজ কুমার / Raj Kumar" />
+            </FormRow>
+            <FormRow label="Email:">
+                <TextInput value="raj.kumar@gmail.com" />
+            </FormRow>
+            <FormRow label="Room Info:">
+                <TextInput value="Corner room, attached bathroom" />
+            </FormRow>
+            <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Changes</button>
+            
+            <div className="border-t pt-6 mt-6 border-red-500/30">
+                <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This action is permanent and cannot be undone.</p>
+                <button onClick={handleDelete} className="mt-3 px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20 rounded-md hover:bg-red-200 dark:hover:bg-red-500/30">Delete My Account</button>
+            </div>
         </div>
-        <FormRow label="Full Name (Bangla/English):">
-            <TextInput value="রাজ কুমার / Raj Kumar" />
-        </FormRow>
-        <FormRow label="Email:">
-            <TextInput value="raj.kumar@gmail.com" />
-        </FormRow>
-        <FormRow label="Room Info:">
-            <TextInput value="Corner room, attached bathroom" />
-        </FormRow>
-        <button className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Changes</button>
-        
-        <div className="border-t pt-6 mt-6 border-red-500/30">
-            <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This action is permanent and cannot be undone.</p>
-            <button className="mt-3 px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20 rounded-md hover:bg-red-200 dark:hover:bg-red-500/30">Delete My Account</button>
-        </div>
-    </div>
-);
+    );
+}
 
-const ContactsTabContent: React.FC = () => (
-    <div className="space-y-6">
-        <SectionHeader title="Contact Information" />
-        <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2">Other members can see this info.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <FormRow label="Phone Number:"><TextInput value="+880 1712345678" /></FormRow>
-             <FormRow label="WhatsApp Number:">
-                <div className="space-y-2">
-                    <RadioButton name="whatsapp" label="Same as phone" checked />
-                    <RadioButton name="whatsapp" label="Different: +880 [________]" />
-                </div>
-            </FormRow>
-             <FormRow label="Facebook Profile:"><TextInput value="facebook.com/rajkumar" /></FormRow>
-             <FormRow label="Bkash Number (for payments):"><TextInput value="+880 1712345678" /></FormRow>
-             <FormRow label="Nagad Number:"><TextInput value="+880 1712345678" /></FormRow>
-             <FormRow label="Emergency Contact:">
-                <div className="space-y-2">
-                    <TextInput value="Father's name" placeholder="Name" />
-                    <TextInput value="+880 1711111111" placeholder="Phone" />
-                </div>
-            </FormRow>
+const ContactsTabContent: React.FC = () => {
+    const { addToast } = useNotifications();
+    const handleSave = () => addToast({ type: 'success', title: 'Contacts Saved', message: 'Your contact information has been updated.' });
+    return (
+        <div className="space-y-6">
+            <SectionHeader title="Contact Information" />
+            <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2">Other members can see this info.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormRow label="Phone Number:"><TextInput value="+880 1712345678" /></FormRow>
+                <FormRow label="WhatsApp Number:">
+                    <div className="space-y-2">
+                        <RadioButton name="whatsapp" label="Same as phone" checked />
+                        <RadioButton name="whatsapp" label="Different: +880 [________]" />
+                    </div>
+                </FormRow>
+                <FormRow label="Facebook Profile:"><TextInput value="facebook.com/rajkumar" /></FormRow>
+                <FormRow label="Bkash Number (for payments):"><TextInput value="+880 1712345678" /></FormRow>
+                <FormRow label="Nagad Number:"><TextInput value="+880 1712345678" /></FormRow>
+                <FormRow label="Emergency Contact:">
+                    <div className="space-y-2">
+                        <TextInput value="Father's name" placeholder="Name" />
+                        <TextInput value="+880 1711111111" placeholder="Phone" />
+                    </div>
+                </FormRow>
+            </div>
+            <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Contact Info</button>
         </div>
-        <button className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Contact Info</button>
-    </div>
-);
+    );
+}
 
 const NotificationsTabContent: React.FC = () => {
     const { user } = useAuth();
     const { addToast } = useNotifications();
     const isManager = user?.role === Role.Manager;
+    const handleSave = () => addToast({ type: 'success', title: 'Preferences Saved', message: 'Your notification settings have been updated.' });
 
     return (
         <div className="space-y-8">
@@ -147,57 +162,65 @@ const NotificationsTabContent: React.FC = () => {
                 </div>
             </div>
             <div className="flex flex-wrap gap-4 items-center">
-                 <button className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Preferences</button>
-                 <button onClick={() => addToast({ type: 'success', title: 'পেমেন্ট সফল', message: 'Payment submitted successfully' })} className="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 rounded-md">Test Toast</button>
+                 <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Preferences</button>
             </div>
         </div>
     );
 };
 
 
-const RoomManagementTabContent: React.FC = () => (
-    <div className="space-y-6">
-        <SectionHeader title="Room Management" />
-        <FormRow label="Room Name:"><TextInput value="Flat 3B, Dhanmondi" /></FormRow>
-        <FormRow label="Full Address:"><TextInput value="Road 5, House 12, Dhanmondi, Dhaka - 1205" /></FormRow>
-        <FormRow label="Room Code:">
-            <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg flex items-center justify-between">
-                <span className="font-mono text-xl tracking-widest">AB1234</span>
-                <div className="flex gap-2">
-                    <button className="flex items-center gap-1 text-sm font-semibold"><ClipboardIcon className="w-4 h-4" />Copy Code</button>
-                    <button className="flex items-center gap-1 text-sm font-semibold"><RefreshIcon className="w-4 h-4" />Generate New</button>
+const RoomManagementTabContent: React.FC = () => {
+    const { addToast } = useNotifications();
+    const handleSave = () => addToast({ type: 'success', title: 'Settings Saved', message: 'Room management settings have been updated.' });
+    const handleDelete = () => {
+        if (window.confirm('Are you sure you want to delete this room? This will erase all data for all members and cannot be undone.')) {
+            addToast({ type: 'error', title: 'Room Deleted', message: 'The room and all its data have been permanently deleted.' });
+        }
+    };
+    return (
+        <div className="space-y-6">
+            <SectionHeader title="Room Management" />
+            <FormRow label="Room Name:"><TextInput value="Flat 3B, Dhanmondi" /></FormRow>
+            <FormRow label="Full Address:"><TextInput value="Road 5, House 12, Dhanmondi, Dhaka - 1205" /></FormRow>
+            <FormRow label="Room Code:">
+                <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-lg flex items-center justify-between">
+                    <span className="font-mono text-xl tracking-widest">AB1234</span>
+                    <div className="flex gap-2">
+                        <button className="flex items-center gap-1 text-sm font-semibold"><ClipboardIcon className="w-4 h-4" />Copy Code</button>
+                        <button className="flex items-center gap-1 text-sm font-semibold"><RefreshIcon className="w-4 h-4" />Generate New</button>
+                    </div>
                 </div>
-            </div>
-             <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">⚠️ Old code will stop working</p>
-        </FormRow>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">⚠️ Old code will stop working</p>
+            </FormRow>
 
-        <SectionHeader title="Default Settings" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormRow label="Currency:"><div className="flex gap-4"><RadioButton name="currency" label="BDT (৳)" checked /><RadioButton name="currency" label="USD ($)" /></div></FormRow>
-            <FormRow label="Default Meal Quantity:"><TextInput value="2" /></FormRow>
-            <FormRow label="Meal Rate Calculation:">
-                <div className="space-y-2">
-                    <RadioButton name="mealRate" label="Auto (Total Shopping ÷ Meals)" checked />
-                    <RadioButton name="mealRate" label="Fixed Rate: ৳ [____]" />
-                </div>
-            </FormRow>
-            <FormRow label="Bill Due Date Reminder:"><TextInput value="3" /></FormRow>
-            <FormRow label="Auto-Push Rent Bills:">
-                <div className="space-y-2">
-                    <Checkbox label="Enabled (creates next month)" checked />
-                    <TextInput value="25th" />
-                </div>
-            </FormRow>
+            <SectionHeader title="Default Settings" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormRow label="Currency:"><div className="flex gap-4"><RadioButton name="currency" label="BDT (৳)" checked /><RadioButton name="currency" label="USD ($)" /></div></FormRow>
+                <FormRow label="Default Meal Quantity:"><TextInput value="2" /></FormRow>
+                <FormRow label="Meal Rate Calculation:">
+                    <div className="space-y-2">
+                        <RadioButton name="mealRate" label="Auto (Total Shopping ÷ Meals)" checked />
+                        <RadioButton name="mealRate" label="Fixed Rate: ৳ [____]" />
+                    </div>
+                </FormRow>
+                <FormRow label="Bill Due Date Reminder:"><TextInput value="3" /></FormRow>
+                <FormRow label="Auto-Push Rent Bills:">
+                    <div className="space-y-2">
+                        <Checkbox label="Enabled (creates next month)" checked />
+                        <TextInput value="25th" />
+                    </div>
+                </FormRow>
+            </div>
+            <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Settings</button>
+            
+            <div className="border-t pt-6 mt-6 border-red-500/30">
+                <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This will permanently delete all room data, including bills, meals, and member information.</p>
+                <button onClick={handleDelete} className="mt-3 px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20 rounded-md hover:bg-red-200 dark:hover:bg-red-500/30">Delete Room & All Data</button>
+            </div>
         </div>
-        <button className="px-6 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Settings</button>
-        
-         <div className="border-t pt-6 mt-6 border-red-500/30">
-            <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">Danger Zone</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">This will permanently delete all room data, including bills, meals, and member information.</p>
-            <button className="mt-3 px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-500/20 rounded-md hover:bg-red-200 dark:hover:bg-red-500/30">Delete Room & All Data</button>
-        </div>
-    </div>
-);
+    );
+};
 
 const MemberManagementTabContent: React.FC = () => {
     const { setPage } = useAuth();
@@ -267,7 +290,7 @@ const SettingsPage: React.FC = () => {
                     ))}
                 </nav>
             </aside>
-            <main className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+            <main key={activeTab} className="flex-1 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md animate-fade-in">
                 {renderContent()}
             </main>
         </div>

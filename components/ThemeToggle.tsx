@@ -8,7 +8,7 @@ const ThemeToggle: React.FC = () => {
   return (
     <button
       onClick={toggleTheme}
-      className="w-full flex items-center justify-center p-2 rounded-md text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:focus:ring-offset-gray-800 transition-colors"
+      className="w-full flex items-center justify-center p-2 rounded-md text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-slate-800 transition-colors"
       aria-label="Toggle theme"
     >
       {theme === 'dark' ? (
@@ -18,7 +18,7 @@ const ThemeToggle: React.FC = () => {
         </>
       ) : (
         <>
-            <MoonIcon className="w-5 h-5 mr-2 text-gray-700" />
+            <MoonIcon className="w-5 h-5 mr-2 text-slate-700" />
             <span className="text-sm font-medium">Dark Mode</span>
         </>
       )}

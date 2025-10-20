@@ -2,9 +2,17 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Role } from '../types';
 import { ShoppingCartIcon, ArrowLeftIcon, CameraIcon, FolderIcon, CheckCircleIcon, XIcon } from '../components/Icons';
+import { useNotifications } from '../contexts/NotificationContext';
 
 // MOCK DATA based on wireframes
-const mockShoppingDuty = {
+// FIX: Added ShoppingDuty interface to strongly type the roster data, resolving type errors when iterating over it.
+interface ShoppingDuty {
+    name: string;
+    status: string;
+    amount: number;
+}
+
+const mockShoppingDutyData: Record<string, ShoppingDuty> = {
     'Monday': { name: 'Raj', status: 'Completed', amount: 850 },
     'Tuesday': { name: 'Amit', status: 'Assigned', amount: 0 },
     'Wednesday': { name: 'Priya', status: 'Upcoming', amount: 0 },
@@ -46,10 +54,80 @@ const mockShoppingHistory = [
 ];
 
 // --- MODALS ---
+type Roster = typeof mockShoppingDutyData;
 
-const DepositModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+interface EditRosterModalProps {
+    onClose: () => void;
+    roster: Roster;
+    onSave: (newRoster: Roster) => void;
+}
+
+const EditRosterModal: React.FC<EditRosterModalProps> = ({ onClose, roster, onSave }) => {
+    const [editedRoster, setEditedRoster] = useState(roster);
+    
+    // Hardcoding members list for simplicity since it's mock data
+    const members = ['Raj', 'Amit', 'Priya', 'Ravi'];
+
+    const handleAssignmentChange = (day: string, newName: string) => {
+        setEditedRoster(prev => ({
+            ...prev,
+            [day]: {
+                ...prev[day],
+                name: newName,
+                status: prev[day].name === newName ? prev[day].status : 'Assigned', 
+                amount: prev[day].name === newName ? prev[day].amount : 0
+            }
+        }));
+    };
+
+    const handleSaveChanges = () => {
+        onSave(editedRoster);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 animate-fade-in p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Edit Shopping Roster</h3>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-5 h-5"/></button>
+                </div>
+                <div className="space-y-4">
+                    {/* FIX: Cast `duty` to `ShoppingDuty` to resolve type inference issues with `Object.entries`. */}
+                    {Object.entries(editedRoster).map(([day, duty]) => {
+                        const shoppingDuty = duty as ShoppingDuty;
+                        return (
+                            <div key={day} className="flex items-center justify-between">
+                                <label className="font-semibold text-gray-700 dark:text-gray-300">{day}:</label>
+                                <select 
+                                    value={shoppingDuty.name} 
+                                    onChange={(e) => handleAssignmentChange(day, e.target.value)}
+                                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors"
+                                >
+                                    {members.map(member => <option key={member} value={member}>{member}</option>)}
+                                </select>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="flex gap-3 mt-6 justify-end">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+                    <button onClick={handleSaveChanges} className="px-4 py-2 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const DepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({ onClose, onSubmit }) => {
     const [amount, setAmount] = useState('1500');
     const [method, setMethod] = useState('bKash');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit();
+        onClose();
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 animate-fade-in p-4">
@@ -59,7 +137,7 @@ const DepositModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-5 h-5"/></button>
                 </div>
                 
-                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+                <form className="space-y-4" onSubmit={handleSubmit}>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount:</label>
                         <div className="relative mt-1">
@@ -97,86 +175,123 @@ const DepositModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 const ManagerShoppingView: React.FC = () => {
     const [approvals, setApprovals] = useState(initialPendingApprovals);
+    const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+    const [roster, setRoster] = useState(mockShoppingDutyData);
+    const { addToast } = useNotifications();
     
-    const handleApproval = (type: 'deposits' | 'expenses', id: string) => {
+    const handleAction = (type: 'deposits' | 'expenses', id: string, action: 'approve' | 'deny') => {
+        const item = approvals[type].find(i => i.id === id);
         setApprovals(prev => ({ ...prev, [type]: prev[type].filter(item => item.id !== id) }));
+        if (action === 'approve') {
+            addToast({ type: 'success', title: 'Approved', message: `${type === 'deposits' ? 'Deposit from' : 'Expense by'} ${item?.name} has been approved.` });
+        } else {
+            addToast({ type: 'error', title: 'Denied', message: `${type === 'deposits' ? 'Deposit from' : 'Expense by'} ${item?.name} has been denied.` });
+        }
     }
+
+    const handleSaveRoster = (newRoster: Roster) => {
+        setRoster(newRoster);
+        addToast({ type: 'success', title: 'Roster Updated', message: 'The shopping duty roster has been saved.' });
+        setIsRosterModalOpen(false);
+    };
     
     return (
-        <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                 <h3 className="font-semibold text-lg mb-3">This Week's Shopping Duty</h3>
-                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
-                    {Object.entries(mockShoppingDuty).map(([day, duty]) => (
-                        <div key={day} className="flex justify-between items-center">
-                            <span className="font-medium text-gray-600 dark:text-gray-300">{day}: {duty.name}</span>
-                            <span className={`${duty.status === 'Completed' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                {duty.status === 'Completed' ? `✅ Completed - ৳${duty.amount}` : duty.status === 'Assigned' ? '🔄 Assigned' : ''}
-                            </span>
-                        </div>
-                    ))}
-                 </div>
-                 <button className="text-sm font-semibold text-primary hover:underline mt-4">Edit Roster</button>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                 <h3 className="font-semibold text-lg mb-3">Fund Status</h3>
-                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 grid grid-cols-2 gap-4">
-                     <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Deposits</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalDeposits}</p>
+        <>
+            <div className="space-y-6">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                     <h3 className="font-semibold text-lg mb-3">This Week's Shopping Duty</h3>
+                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
+                        {/* FIX: Cast `duty` to `ShoppingDuty` to resolve type inference issues with `Object.entries`. */}
+                        {Object.entries(roster).map(([day, duty]) => {
+                            const shoppingDuty = duty as ShoppingDuty;
+                            return (
+                                <div key={day} className="flex justify-between items-center">
+                                    <span className="font-medium text-gray-600 dark:text-gray-300">{day}: {shoppingDuty.name}</span>
+                                    <span className={`${shoppingDuty.status === 'Completed' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        {shoppingDuty.status === 'Completed' ? `✅ Completed - ৳${shoppingDuty.amount}` : shoppingDuty.status === 'Assigned' ? '🔄 Assigned' : ''}
+                                    </span>
+                                </div>
+                            );
+                        })}
                      </div>
-                     <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Total Shopping</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalShopping}</p>
+                     <button onClick={() => setIsRosterModalOpen(true)} className="text-sm font-semibold text-primary hover:underline mt-4">Edit Roster</button>
+                </div>
+                
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                     <h3 className="font-semibold text-lg mb-3">Fund Status</h3>
+                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 grid grid-cols-2 gap-4">
+                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Deposits</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalDeposits}</p>
+                         </div>
+                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Shopping</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalShopping}</p>
+                         </div>
+                         <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-md">
+                            <p className="text-sm text-green-600 dark:text-green-300">Fund Balance</p><p className="font-bold text-lg text-green-600 dark:text-green-300">+৳{mockFundStatus.balance}</p>
+                         </div>
+                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Current Rate</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.rate}/qty</p>
+                         </div>
                      </div>
-                     <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-md">
-                        <p className="text-sm text-green-600 dark:text-green-300">Fund Balance</p><p className="font-bold text-lg text-green-600 dark:text-green-300">+৳{mockFundStatus.balance}</p>
-                     </div>
-                     <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Current Rate</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.rate}/qty</p>
-                     </div>
-                 </div>
-            </div>
+                </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                <h3 className="font-semibold text-lg mb-3 text-yellow-600 dark:text-yellow-400">🔔 Pending Approvals ({approvals.deposits.length + approvals.expenses.length})</h3>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-4">
-                    {approvals.deposits.length > 0 && <div>
-                        <h4 className="font-semibold mb-2">💰 Deposits ({approvals.deposits.length})</h4>
-                        {approvals.deposits.map(d => (
-                            <div key={d.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                <p className="font-bold">{d.name} - ৳{d.amount} - {d.method}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{d.date} • {d.trxId}</p>
-                                <div className="flex justify-end gap-2 mt-2">
-                                    <button className="text-xs font-semibold text-primary hover:underline">View Screenshot</button>
-                                    <button onClick={() => handleApproval('deposits', d.id)} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                                    <button onClick={() => handleApproval('deposits', d.id)} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+                    <h3 className="font-semibold text-lg mb-3 text-yellow-600 dark:text-yellow-400">🔔 Pending Approvals ({approvals.deposits.length + approvals.expenses.length})</h3>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-4">
+                        {approvals.deposits.length > 0 && <div>
+                            <h4 className="font-semibold mb-2">💰 Deposits ({approvals.deposits.length})</h4>
+                            {approvals.deposits.map(d => (
+                                <div key={d.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <p className="font-bold">{d.name} - ৳{d.amount} - {d.method}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{d.date} • {d.trxId}</p>
+                                    <div className="flex justify-end gap-2 mt-2">
+                                        <button className="text-xs font-semibold text-primary hover:underline">View Screenshot</button>
+                                        <button onClick={() => handleAction('deposits', d.id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
+                                        <button onClick={() => handleAction('deposits', d.id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>}
-                     {approvals.expenses.length > 0 && <div>
-                        <h4 className="font-semibold mb-2">🛒 Shopping Expenses ({approvals.expenses.length})</h4>
-                        {approvals.expenses.map(e => (
-                             <div key={e.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                <p className="font-bold">{e.name} - ৳{e.amount}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{e.date} • {e.items}</p>
-                                <div className="flex justify-end gap-2 mt-2">
-                                    <button className="text-xs font-semibold text-primary hover:underline">View Receipt</button>
-                                    <button onClick={() => handleApproval('expenses', e.id)} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                                    <button onClick={() => handleApproval('expenses', e.id)} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                            ))}
+                        </div>}
+                         {approvals.expenses.length > 0 && <div>
+                            <h4 className="font-semibold mb-2">🛒 Shopping Expenses ({approvals.expenses.length})</h4>
+                            {approvals.expenses.map(e => (
+                                 <div key={e.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <p className="font-bold">{e.name} - ৳{e.amount}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{e.date} • {e.items}</p>
+                                    <div className="flex justify-end gap-2 mt-2">
+                                        <button className="text-xs font-semibold text-primary hover:underline">View Receipt</button>
+                                        <button onClick={() => handleAction('expenses', e.id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
+                                        <button onClick={() => handleAction('expenses', e.id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>}
+                            ))}
+                        </div>}
+                    </div>
                 </div>
             </div>
-        </div>
+            {isRosterModalOpen && (
+                <EditRosterModal
+                    onClose={() => setIsRosterModalOpen(false)}
+                    roster={roster}
+                    onSave={handleSaveRoster}
+                />
+            )}
+        </>
     );
 };
 
 const MemberShoppingView: React.FC = () => {
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+    const { addToast } = useNotifications();
     
+    const handleDepositSubmit = () => {
+        addToast({ type: 'success', title: 'Deposit Submitted', message: 'Your deposit is now pending manager approval.' });
+    };
+
+    const handleExpenseSubmit = () => {
+         addToast({ type: 'success', title: 'Expense Submitted', message: 'Your shopping expense is now pending manager approval.' });
+    };
+
     return (
         <>
         <div className="space-y-6">
@@ -219,11 +334,11 @@ const MemberShoppingView: React.FC = () => {
                         ))}
                     </ul>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">Next Duty: <span className="font-semibold">Oct 25</span></p>
-                    <button className="w-full mt-3 py-2 border-2 border-primary text-primary font-semibold rounded-lg hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors">Submit Shopping Expense</button>
+                    <button onClick={handleExpenseSubmit} className="w-full mt-3 py-2 border-2 border-primary text-primary font-semibold rounded-lg hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-colors">Submit Shopping Expense</button>
                 </div>
             </div>
         </div>
-        {isDepositModalOpen && <DepositModal onClose={() => setIsDepositModalOpen(false)} />}
+        {isDepositModalOpen && <DepositModal onClose={() => setIsDepositModalOpen(false)} onSubmit={handleDepositSubmit} />}
         </>
     );
 };

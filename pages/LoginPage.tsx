@@ -31,7 +31,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
       {/* Left Panel */}
       <div className="hidden lg:flex w-2/5 bg-primary-600 items-center justify-center p-12 text-white flex-col relative">
         <div className="absolute top-8 left-8">
@@ -53,15 +53,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
       <div className="w-full lg:w-3/5 flex items-center justify-center p-6 sm:p-12">
         <div className="max-w-md w-full">
             <div className="lg:hidden text-center mb-8">
-                <h1 className="text-center text-4xl font-bold text-primary">BillKhata</h1>
+                <h1 className="text-center text-4xl font-bold text-primary-600">BillKhata</h1>
             </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             Log in to your account
           </h2>
-          <div className="bg-white dark:bg-gray-800 p-8 mt-8 rounded-lg shadow-lg">
+          <div className="bg-white dark:bg-slate-800 p-8 mt-8 rounded-lg shadow-lg">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Email address
                 </label>
                 <div className="mt-1">
@@ -73,13 +73,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="block w-full appearance-none rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-primary focus:outline-none focus:ring-primary sm:text-sm bg-white dark:bg-gray-700 dark:text-white"
+                    className="block w-full appearance-none rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 placeholder-slate-400 dark:placeholder-slate-500 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm bg-white dark:bg-slate-700 dark:text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="password"className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor="password"className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Password
                 </label>
                 <div className="mt-1">
@@ -91,7 +91,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full appearance-none rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-primary focus:outline-none focus:ring-primary sm:text-sm bg-white dark:bg-gray-700 dark:text-white"
+                    className="block w-full appearance-none rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 placeholder-slate-400 dark:placeholder-slate-500 shadow-sm focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm bg-white dark:bg-slate-700 dark:text-white"
                   />
                 </div>
               </div>
@@ -102,15 +102,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex w-full justify-center rounded-md border border-transparent bg-primary py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50"
+                  className="flex w-full justify-center rounded-md border border-transparent bg-primary-500 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 disabled:opacity-50"
                 >
                   {loading ? <SpinnerIcon className="h-5 w-5" /> : 'Log In'}
                 </button>
               </div>
             </form>
-            <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
               Don't have an account?{' '}
-              <button onClick={onNavigateToSignUp} className="font-medium text-primary hover:text-primary-500">
+              <button onClick={onNavigateToSignUp} className="font-medium text-primary-600 hover:text-primary-500">
                 Sign up
               </button>
             </p>
