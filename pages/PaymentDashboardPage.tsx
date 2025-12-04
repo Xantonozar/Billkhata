@@ -1,46 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Role } from '../types';
 import { ChartBarIcon, CreditCardIcon, ExportIcon } from '../components/Icons';
-
-// --- MOCK DATA ---
-const mockPaymentsData: { [key: string]: any } = {
-    'October 2025': {
-        overviewData: { totalAmount: '₹27,550', totalBills: 8, billsPaid: { count: 5, percent: '62.5%' }, billsPending: { count: 3, percent: '37.5%' } },
-        memberSummaryData: [
-            { name: 'Raj', totalDue: '₹6,887.50', paid: '₹5,300', pending: '₹1,587.50', status: '⚠️ 1 Overdue' },
-            { name: 'Amit', totalDue: '₹6,887.50', paid: '₹6,887.50', pending: '₹0', status: '✅ All Paid' },
-            { name: 'Priya', totalDue: '₹6,887.50', paid: '₹6,300', pending: '₹587.50', status: '⏳ 1 Pending' },
-            { name: 'Ravi', totalDue: '₹6,887.50', paid: '₹6,887.50', pending: '₹0', status: '✅ All Paid' }
-        ],
-        billDetailsData: [
-            { bill: 'Rent', amount: 20000, split: 5000, dueDate: 'Oct 1', statuses: ['✅', '✅', '⚠️', '✅'], progress: '75%' },
-            { bill: 'Electricity', amount: 1200, split: 300, dueDate: 'Oct 15', statuses: ['✅', '✅', '✅', '❌'], progress: '75%' },
-            { bill: 'Wi-Fi', amount: 1000, split: 250, dueDate: 'Oct 10', statuses: ['✅', '✅', '⏳', '✅'], progress: '75%' },
-        ]
-    },
-    'September 2025': {
-        overviewData: { totalAmount: '₹25,800', totalBills: 6, billsPaid: { count: 6, percent: '100%' }, billsPending: { count: 0, percent: '0%' } },
-        memberSummaryData: [
-            { name: 'Raj', totalDue: '₹6,450', paid: '₹6,450', pending: '₹0', status: '✅ All Paid' },
-            { name: 'Amit', totalDue: '₹6,450', paid: '₹6,450', pending: '₹0', status: '✅ All Paid' },
-            { name: 'Priya', totalDue: '₹6,450', paid: '₹6,450', pending: '₹0', status: '✅ All Paid' },
-            { name: 'Ravi', totalDue: '₹6,450', paid: '₹6,450', pending: '₹0', status: '✅ All Paid' }
-        ],
-        billDetailsData: [
-            { bill: 'Rent', amount: 20000, split: 5000, dueDate: 'Sep 1', statuses: ['✅', '✅', '✅', '✅'], progress: 'Done' },
-            { bill: 'Electricity', amount: 1100, split: 275, dueDate: 'Sep 15', statuses: ['✅', '✅', '✅', '✅'], progress: 'Done' },
-        ]
-    }
-};
-
-const mockPunctualityData: { [key: string]: any[] } = {
-    'Last Month': [{ name: 'Raj', percent: 90 }, { name: 'Amit', percent: 100 }, { name: 'Priya', percent: 100 }, { name: 'Ravi', percent: 95 }],
-    'Last 3 Months': [{ name: 'Raj', percent: 75 }, { name: 'Amit', percent: 100 }, { name: 'Priya', percent: 92 }, { name: 'Ravi', percent: 98 }],
-    'Last 6 Months': [{ name: 'Raj', percent: 80 }, { name: 'Amit', percent: 95 }, { name: 'Priya', percent: 94 }, { name: 'Ravi', percent: 97 }],
-    'Last 1 Year': [{ name: 'Raj', percent: 82 }, { name: 'Amit', percent: 96 }, { name: 'Priya', percent: 91 }, { name: 'Ravi', percent: 95 }],
-    'Last 2 Years': [{ name: 'Raj', percent: 85 }, { name: 'Amit', percent: 98 }, { name: 'Priya', percent: 93 }, { name: 'Ravi', percent: 96 }],
-};
+import { api } from '../services/api';
+import { useNotifications } from '../contexts/NotificationContext';
 
 // --- Sub-components ---
 
@@ -62,7 +25,7 @@ const PunctualityBar: React.FC<{ name: string; percent: number }> = ({ name, per
 
     return (
         <div className="flex items-center gap-4">
-            <span className="w-12 font-medium">{name}</span>
+            <span className="w-12 font-medium truncate" title={name}>{name}</span>
             <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                 <div className={`${getColor()} h-4 rounded-full`} style={{ width: `${percent}%` }}></div>
             </div>
@@ -74,8 +37,175 @@ const PunctualityBar: React.FC<{ name: string; percent: number }> = ({ name, per
 
 const PaymentDashboardPage: React.FC = () => {
     const { user } = useAuth();
-    const [selectedMonth, setSelectedMonth] = useState('October 2025');
+    const { addToast } = useNotifications();
+    const [selectedMonth, setSelectedMonth] = useState(new Date());
     const [punctualityRange, setPunctualityRange] = useState('Last 3 Months');
+    const [loading, setLoading] = useState(true);
+
+    // Data states
+    const [bills, setBills] = useState<any[]>([]);
+    const [members, setMembers] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!user?.khataId) return;
+
+            setLoading(true);
+            try {
+                const [billsData, membersData] = await Promise.all([
+                    api.getBillsForRoom(user.khataId),
+                    api.getMembersForRoom(user.khataId)
+                ]);
+                setBills(billsData);
+                setMembers(membersData);
+            } catch (error) {
+                console.error('Error fetching payment data:', error);
+                addToast({ type: 'error', title: 'Error', message: 'Failed to load payment data' });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [user?.khataId, addToast]);
+
+    // Generate month options
+    const monthOptions = useMemo(() => {
+        const options = [];
+        for (let i = 0; i < 12; i++) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            options.push(date);
+        }
+        return options;
+    }, []);
+
+    const currentData = useMemo(() => {
+        if (loading) return null;
+
+        const year = selectedMonth.getFullYear();
+        const month = selectedMonth.getMonth();
+
+        // Filter bills for selected month
+        const monthlyBills = bills.filter(b => {
+            const date = new Date(b.dueDate);
+            return date.getMonth() === month && date.getFullYear() === year;
+        });
+
+        // 1. Overview Data
+        const totalAmount = monthlyBills.reduce((sum, b) => sum + b.totalAmount, 0);
+        const totalBills = monthlyBills.length;
+
+        let fullyPaidCount = 0;
+        monthlyBills.forEach(bill => {
+            const allPaid = bill.shares.every((s: any) => s.status === 'Paid');
+            if (allPaid) fullyPaidCount++;
+        });
+
+        const pendingCount = totalBills - fullyPaidCount;
+        const paidPercent = totalBills > 0 ? Math.round((fullyPaidCount / totalBills) * 100) : 0;
+        const pendingPercent = totalBills > 0 ? Math.round((pendingCount / totalBills) * 100) : 0;
+
+        // 2. Member Summary Data
+        const memberSummaryData = members.map(member => {
+            let totalDue = 0;
+            let paid = 0;
+            let pending = 0;
+            let pendingCount = 0;
+
+            monthlyBills.forEach(bill => {
+                const share = bill.shares.find((s: any) => String(s.userId) === String(member.id));
+                if (share) {
+                    totalDue += share.amount;
+                    if (share.status === 'Paid') {
+                        paid += share.amount;
+                    } else {
+                        pending += share.amount;
+                        pendingCount++;
+                    }
+                }
+            });
+
+            return {
+                name: member.name,
+                totalDue: `₹${totalDue.toFixed(2)}`,
+                paid: `₹${paid.toFixed(2)}`,
+                pending: `₹${pending.toFixed(2)}`,
+                status: pendingCount === 0 ? '✅ All Paid' : `⏳ ${pendingCount} Pending`
+            };
+        });
+
+        // 3. Bill Details Data
+        const billDetailsData = monthlyBills.map(bill => {
+            const shares = bill.shares || [];
+            const statuses = members.map(member => {
+                const share = shares.find((s: any) => String(s.userId) === String(member.id));
+                if (!share) return '-';
+                if (share.status === 'Paid') return '✅';
+                return '⏳'; // Could add '⚠️' logic if overdue
+            });
+
+            const paidShares = shares.filter((s: any) => s.status === 'Paid').length;
+            const totalShares = shares.length;
+            const progress = totalShares > 0 ? Math.round((paidShares / totalShares) * 100) + '%' : '0%';
+
+            // Calculate split amount (assuming equal split or taking first share)
+            const splitAmount = shares.length > 0 ? shares[0].amount : 0;
+
+            return {
+                bill: bill.title,
+                amount: bill.totalAmount,
+                split: splitAmount,
+                dueDate: new Date(bill.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+                statuses,
+                progress
+            };
+        });
+
+        return {
+            overviewData: {
+                totalAmount: `₹${totalAmount.toFixed(0)}`,
+                totalBills,
+                billsPaid: { count: fullyPaidCount, percent: `${paidPercent}%` },
+                billsPending: { count: pendingCount, percent: `${pendingPercent}%` }
+            },
+            memberSummaryData,
+            billDetailsData
+        };
+    }, [bills, members, selectedMonth, loading]);
+
+    const punctualityData = useMemo(() => {
+        if (loading) return [];
+
+        const now = new Date();
+        let startDate = new Date();
+
+        if (punctualityRange === 'Last Month') startDate.setMonth(now.getMonth() - 1);
+        else if (punctualityRange === 'Last 3 Months') startDate.setMonth(now.getMonth() - 3);
+        else if (punctualityRange === 'Last 6 Months') startDate.setMonth(now.getMonth() - 6);
+        else if (punctualityRange === 'Last 1 Year') startDate.setFullYear(now.getFullYear() - 1);
+        else if (punctualityRange === 'Last 2 Years') startDate.setFullYear(now.getFullYear() - 2);
+
+        const rangeBills = bills.filter(b => new Date(b.dueDate) >= startDate);
+
+        return members.map(member => {
+            let totalShares = 0;
+            let paidShares = 0;
+
+            rangeBills.forEach(bill => {
+                const share = bill.shares.find((s: any) => String(s.userId) === String(member.id));
+                if (share) {
+                    totalShares++;
+                    if (share.status === 'Paid') paidShares++;
+                }
+            });
+
+            const percent = totalShares > 0 ? Math.round((paidShares / totalShares) * 100) : 100;
+            return { name: member.name, percent };
+        }).sort((a, b) => b.percent - a.percent);
+
+    }, [bills, members, punctualityRange, loading]);
+
 
     if (user?.role !== Role.Manager) {
         return (
@@ -85,18 +215,30 @@ const PaymentDashboardPage: React.FC = () => {
             </div>
         );
     }
-    
-    const currentData = mockPaymentsData[selectedMonth];
-    const currentPunctualityData = mockPunctualityData[punctualityRange];
+
+    if (loading || !currentData) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-primary-500"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 animate-fade-in">
             <div className="flex flex-wrap justify-between items-center gap-4">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Payment Dashboard</h1>
                 <div className="flex items-center gap-2">
-                    <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="px-4 py-2 text-sm font-semibold bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm">
-                        <option>October 2025</option>
-                        <option>September 2025</option>
+                    <select
+                        value={selectedMonth.toISOString()}
+                        onChange={e => setSelectedMonth(new Date(e.target.value))}
+                        className="px-4 py-2 text-sm font-semibold bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm"
+                    >
+                        {monthOptions.map(month => (
+                            <option key={month.toISOString()} value={month.toISOString()}>
+                                {month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                            </option>
+                        ))}
                     </select>
                     <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-md shadow-sm hover:bg-primary-600">
                         <ExportIcon className="w-4 h-4" />
@@ -139,11 +281,11 @@ const PaymentDashboardPage: React.FC = () => {
                     </tbody>
                 </table>
             </div>
-            
+
             {/* Bill Details */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-x-auto">
                 <h3 className="p-5 text-lg font-semibold text-gray-800 dark:text-white">Bill Details</h3>
-                <p className="px-5 pb-3 text-xs text-gray-500 dark:text-gray-400">Legend: ✅ Paid & Approved | ⏳ Pending Approval | ❌ Not Paid | ⚠️ Overdue</p>
+                <p className="px-5 pb-3 text-xs text-gray-500 dark:text-gray-400">Legend: ✅ Paid | ⏳ Pending</p>
                 <table className="w-full text-sm text-center">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-xs text-gray-600 dark:text-gray-300 uppercase">
                         <tr>
@@ -151,34 +293,41 @@ const PaymentDashboardPage: React.FC = () => {
                             <th className="px-4 py-3">Amount</th>
                             <th className="px-4 py-3">Split</th>
                             <th className="px-4 py-3">Due Date</th>
-                            <th className="px-4 py-3">Raj</th>
-                            <th className="px-4 py-3">Amit</th>
-                            <th className="px-4 py-3">Priya</th>
-                            <th className="px-4 py-3">Ravi</th>
+                            {members.map(m => (
+                                <th key={m.id} className="px-4 py-3">{m.name.split(' ')[0]}</th>
+                            ))}
                             <th className="px-4 py-3">Status</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {currentData.billDetailsData.map((bill: any) => (
-                             <tr key={bill.bill} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                                <td className="px-4 py-3 text-left font-medium text-gray-900 dark:text-white">{bill.bill}</td>
-                                <td className="px-4 py-3">₹{bill.amount.toLocaleString()}</td>
-                                <td className="px-4 py-3">₹{bill.split.toLocaleString()}</td>
-                                <td className="px-4 py-3">{bill.dueDate}</td>
-                                {bill.statuses.map((status: string, index: number) => <td key={index} className="px-4 py-3">{status}</td>)}
-                                <td className="px-4 py-3 font-semibold">{bill.progress}</td>
+                        {currentData.billDetailsData.length === 0 ? (
+                            <tr>
+                                <td colSpan={5 + members.length} className="px-4 py-8 text-center text-gray-500">No bills found for this month</td>
                             </tr>
-                        ))}
+                        ) : (
+                            currentData.billDetailsData.map((bill: any) => (
+                                <tr key={bill.bill} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                                    <td className="px-4 py-3 text-left font-medium text-gray-900 dark:text-white">{bill.bill}</td>
+                                    <td className="px-4 py-3">৳{bill.amount.toLocaleString()}</td>
+                                    <td className="px-4 py-3">৳{bill.split.toLocaleString()}</td>
+                                    <td className="px-4 py-3">{bill.dueDate}</td>
+                                    {bill.statuses.map((status: string, index: number) => (
+                                        <td key={index} className="px-4 py-3">{status}</td>
+                                    ))}
+                                    <td className="px-4 py-3 font-semibold">{bill.progress}</td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
 
             {/* Payment Punctuality */}
-             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
                 <div className="flex flex-wrap gap-4 justify-between items-center">
                     <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Payment Punctuality</h3>
                     <div className="flex flex-wrap items-center gap-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-md">
-                        {Object.keys(mockPunctualityData).map(range => (
+                        {['Last Month', 'Last 3 Months', 'Last 6 Months', 'Last 1 Year'].map(range => (
                             <button key={range} onClick={() => setPunctualityRange(range)} className={`px-2 py-1 text-xs font-semibold rounded ${punctualityRange === range ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500 dark:text-gray-300'}`}>
                                 {range}
                             </button>
@@ -186,9 +335,9 @@ const PaymentDashboardPage: React.FC = () => {
                     </div>
                 </div>
                 <div className="mt-4 space-y-3 text-sm">
-                    {currentPunctualityData.map(p => <PunctualityBar key={p.name} name={p.name} percent={p.percent} />)}
+                    {punctualityData.map(p => <PunctualityBar key={p.name} name={p.name} percent={p.percent} />)}
                 </div>
-                 <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">Green: &gt;90% | Yellow: 70-90% | Red: &lt;70%</p>
+                <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">Green: &gt;90% | Yellow: 70-90% | Red: &lt;70%</p>
             </div>
         </div>
     );

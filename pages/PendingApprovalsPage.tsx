@@ -1,186 +1,268 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Role } from '../types';
-import { BellIcon, ClipboardCheckIcon } from '../components/Icons';
+import { api } from '../services/api';
+import { Role, Bill } from '../types';
 import { useNotifications } from '../contexts/NotificationContext';
+import { CheckCircleIcon, UserCircleIcon, HomeIcon, ElectricityIcon, WaterIcon, GasIcon, WifiIcon, MaidIcon, OtherIcon } from '../components/Icons';
 
-// --- MOCK DATA ---
-const initialApprovals = {
-    billPayments: [
-        { id: 'bp1', type: 'Electricity Bill', user: 'Raj', amount: 300, date: 'Oct 8, 2025 (2 hours ago)' },
-        { id: 'bp2', type: 'Water Bill', user: 'Priya', amount: 200, date: 'Oct 7, 2025 (1 day ago)' },
-        { id: 'bp3', type: 'Wi-Fi Bill', user: 'Amit', amount: 250, date: 'Oct 6, 2025 (2 days ago)' },
-    ],
-    shopping: [
-        { id: 's1', user: 'Raj', amount: 850, date: 'Oct 7, 2025', items: 'Rice (5kg), dal (2kg), vegetables, cooking oil (1L)', notes: 'Monthly groceries' }
-    ],
-    deposits: [
-        { id: 'd1', user: 'Amit', amount: 2000, date: 'Oct 8, 2025', method: 'UPI', trxId: '1234567890', notes: 'Monthly meal fund' }
-    ],
-    joinRequests: [], // Initially empty as per wireframe
-    mealEntries: [
-        { id: 'me1', user: 'Raj Kumar', date: 'Oct 9, 2025', quantities: { b: 1, l: 0.5, d: 0 }, total: 1.5, notes: 'Ate outside for dinner' }
-    ],
+const categoryIcons: Record<string, React.ReactElement> = {
+    'Rent': <HomeIcon className="w-5 h-5 text-danger-500" />,
+    'Electricity': <ElectricityIcon className="w-5 h-5 text-yellow-500" />,
+    'Water': <WaterIcon className="w-5 h-5 text-blue-500" />,
+    'Gas': <GasIcon className="w-5 h-5 text-orange-500" />,
+    'Wi-Fi': <WifiIcon className="w-5 h-5 text-cyan-500" />,
+    'Maid': <MaidIcon className="w-5 h-5 text-purple-500" />,
+    'Others': <OtherIcon className="w-5 h-5 text-slate-500" />,
 };
 
-type Tab = 'Bill Payments' | 'Shopping' | 'Deposits' | 'Join Requests' | 'Meal Entries';
+type TabType = 'bill-payments' | 'shopping' | 'deposits' | 'meal-entries' | 'join-requests';
 
 const PendingApprovalsPage: React.FC = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<Tab>('Bill Payments');
-    const [approvals, setApprovals] = useState(initialApprovals);
     const { addToast } = useNotifications();
+    const [activeTab, setActiveTab] = useState<TabType>('bill-payments');
+    const [pendingMemberRequests, setPendingMemberRequests] = useState<any[]>([]);
+    const [pendingBillPayments, setPendingBillPayments] = useState<{ bill: Bill, share: any }[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const handleAction = (category: keyof typeof initialApprovals, id: string, action: 'approve' | 'deny') => {
-        const item = approvals[category].find(i => i.id === id);
-        setApprovals(prev => ({
-            ...prev,
-            [category]: prev[category].filter(item => item.id !== id)
-        }));
-        
-        const actionText = action === 'approve' ? 'Approved' : 'Denied';
-        const toastType = action === 'approve' ? 'success' : 'error';
-        const itemType = category.replace(/([A-Z])/g, ' $1').slice(0, -1); // 'billPayments' -> 'bill payment'
-        
-        addToast({
-            type: toastType,
-            title: `${actionText}`,
-            message: `The ${itemType} from ${item?.user} has been ${actionText.toLowerCase()}.`
-        });
-    };
-    
-    // FIX: The type of `arr` was inferred as `unknown`, causing an error when accessing `arr.length`.
-    // Casting `Object.values(approvals)` to `any[][]` ensures `arr` is treated as an array.
-    const totalTasks = (Object.values(approvals) as any[][]).reduce((sum, arr) => sum + arr.length, 0);
+    const fetchData = async () => {
+        if (user?.khataId && user.role === Role.Manager) {
+            setLoading(true);
+            try {
+                // Fetch Member Requests
+                const memberRequests = await api.getPendingApprovals(user.khataId);
+                setPendingMemberRequests(memberRequests);
 
-    if (user?.role !== Role.Manager) {
-        return <div className="text-center p-8">Access Denied. This page is for managers only.</div>;
-    }
+                // Fetch Bills and filter for Pending Approvals
+                const bills = await api.getBillsForRoom(user.khataId);
+                const pendingPayments: { bill: Bill, share: any }[] = [];
 
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'Bill Payments':
-                return (
-                    <div className="space-y-4">
-                        {approvals.billPayments.map(item => (
-                            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
-                                <h4 className="font-bold text-gray-800 dark:text-white">⚡ {item.type} - {item.user}</h4>
-                                <p className="text-sm mt-1">Amount: <span className="font-semibold">₹{item.amount}</span></p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Marked as paid: {item.date}</p>
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400">Status: Waiting for your approval</p>
-                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => handleAction('billPayments', item.id, 'deny')} className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                                    <button onClick={() => handleAction('billPayments', item.id, 'approve')} className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve Payment</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                );
-            case 'Shopping':
-                 return (
-                    <div className="space-y-4">
-                        {approvals.shopping.map(item => (
-                            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
-                                <h4 className="font-bold text-gray-800 dark:text-white">🛒 Shopping by {item.user}</h4>
-                                <p className="text-sm mt-1"> <span className="font-semibold">₹{item.amount}</span> • {item.date}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2"><strong>Items:</strong> {item.items}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300"><strong>Notes:</strong> "{item.notes}"</p>
-                                <p className="text-sm mt-2"><strong>Receipt:</strong> <button className="font-semibold text-primary hover:underline">[📷 View Image]</button></p>
-                                <p className="mt-3 p-2 text-xs text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900/50 rounded-md text-center">⚠️ This will update meal rate calculation</p>
-                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => handleAction('shopping', item.id, 'deny')} className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny with Reason</button>
-                                    <button onClick={() => handleAction('shopping', item.id, 'approve')} className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                );
-            case 'Deposits':
-                 return (
-                    <div className="space-y-4">
-                        {approvals.deposits.map(item => (
-                             <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
-                                <h4 className="font-bold text-gray-800 dark:text-white">💰 Deposit by {item.user}</h4>
-                                <p className="text-sm mt-1"><span className="font-semibold">₹{item.amount}</span> • {item.date}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2"><strong>Method:</strong> {item.method}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300"><strong>Transaction ID:</strong> {item.trxId}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300"><strong>Notes:</strong> "{item.notes}"</p>
-                                <p className="mt-3 p-2 text-xs text-yellow-800 bg-yellow-100 dark:text-yellow-200 dark:bg-yellow-900/50 rounded-md text-center">⚠️ This will update fund balance</p>
-                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => handleAction('deposits', item.id, 'deny')} className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny with Reason</button>
-                                    <button onClick={() => handleAction('deposits', item.id, 'approve')} className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                );
-            case 'Meal Entries':
-                return (
-                    <div className="space-y-4">
-                        {approvals.mealEntries.map(item => (
-                            <div key={item.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-5">
-                                <h4 className="font-bold text-gray-800 dark:text-white">🍽️ Meal Entry by {item.user}</h4>
-                                <p className="text-sm mt-1"><strong>Date:</strong> {item.date}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2"><strong>Meals:</strong> B: {item.quantities.b}, L: {item.quantities.l}, D: {item.quantities.d} (Total: {item.total})</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-300"><strong>Notes:</strong> "{item.notes}"</p>
-                                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2 justify-end">
-                                    <button onClick={() => handleAction('mealEntries', item.id, 'deny')} className="px-3 py-1 text-sm font-semibold bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Reject</button>
-                                    <button onClick={() => handleAction('mealEntries', item.id, 'approve')} className="px-3 py-1 text-sm font-semibold bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                );
-            case 'Join Requests':
-                 return (
-                     <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
-                        <p className="text-gray-500 dark:text-gray-400">No pending join requests.</p>
-                    </div>
-                );
-            default:
-                return null;
+                bills.forEach(bill => {
+                    bill.shares.forEach(share => {
+                        if (share.status === 'Pending Approval') {
+                            pendingPayments.push({ bill, share });
+                        }
+                    });
+                });
+                setPendingBillPayments(pendingPayments);
+
+            } catch (error) {
+                console.error('Error fetching pending approvals:', error);
+                addToast({ type: 'error', title: 'Error', message: 'Failed to load pending approvals.' });
+            } finally {
+                setLoading(false);
+            }
+        } else {
+            setLoading(false);
         }
     };
-    
-    const tabs: { name: Tab; count: number }[] = [
-        { name: 'Bill Payments', count: approvals.billPayments.length },
-        { name: 'Shopping', count: approvals.shopping.length },
-        { name: 'Deposits', count: approvals.deposits.length },
-        { name: 'Meal Entries', count: approvals.mealEntries.length },
-        { name: 'Join Requests', count: approvals.joinRequests.length },
+
+    useEffect(() => {
+        fetchData();
+    }, [user]);
+
+    const handleApproveMember = async (userId: string) => {
+        if (!user?.khataId) return;
+        try {
+            const success = await api.approveMember(user.khataId, userId);
+            if (success) {
+                setPendingMemberRequests(prev => prev.filter(req => req.id !== userId));
+                addToast({ type: 'success', title: 'Approved', message: 'Member approved successfully' });
+            } else {
+                addToast({ type: 'error', title: 'Error', message: 'Failed to approve member' });
+            }
+        } catch (error) {
+            addToast({ type: 'error', title: 'Error', message: 'Failed to approve member' });
+        }
+    };
+
+    const handleApproveBill = async (billId: string, userId: string) => {
+        const updatedBill = await api.updateBillShareStatus(billId, userId, 'Paid');
+        if (updatedBill) {
+            setPendingBillPayments(prev => prev.filter(item => !(item.bill.id === billId && item.share.userId === userId)));
+            addToast({ type: 'success', title: 'Approved', message: 'Payment approved successfully.' });
+        } else {
+            addToast({ type: 'error', title: 'Error', message: 'Failed to approve payment.' });
+        }
+    };
+
+    const handleDenyBill = async (billId: string, userId: string) => {
+        const updatedBill = await api.updateBillShareStatus(billId, userId, 'Unpaid');
+        if (updatedBill) {
+            setPendingBillPayments(prev => prev.filter(item => !(item.bill.id === billId && item.share.userId === userId)));
+            addToast({ type: 'info', title: 'Denied', message: 'Payment rejected. Status reset to Unpaid.' });
+        } else {
+            addToast({ type: 'error', title: 'Error', message: 'Failed to deny payment.' });
+        }
+    };
+
+    if (loading) return <div className="p-8 text-center">Loading pending requests...</div>;
+
+    if (user?.role !== Role.Manager) {
+        return <div className="p-8 text-center text-red-500">Access Denied. Managers only.</div>;
+    }
+
+    const totalPending = pendingMemberRequests.length + pendingBillPayments.length;
+
+    const tabs = [
+        { id: 'bill-payments' as TabType, label: 'Bill Payments', count: pendingBillPayments.length },
+        { id: 'shopping' as TabType, label: 'Shopping', count: 0 },
+        { id: 'deposits' as TabType, label: 'Deposits', count: 0 },
+        { id: 'meal-entries' as TabType, label: 'Meal Entries', count: 0 },
+        { id: 'join-requests' as TabType, label: 'Join Requests', count: pendingMemberRequests.length },
     ];
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pending Approvals</h1>
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded-full font-semibold">
-                    <BellIcon className="w-5 h-5" />
-                    <span>{totalTasks} Tasks</span>
+            <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-sans">Pending Approvals</h1>
+                <div className="px-4 py-2 bg-warning-500/10 text-warning-600 dark:text-warning-400 rounded-lg font-semibold">
+                    ⚡ {totalPending} Tasks
                 </div>
             </div>
-            
-            <div className="flex items-center border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+
+            {/* Tabs */}
+            <div className="bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg flex gap-1 overflow-x-auto">
                 {tabs.map(tab => (
                     <button
-                        key={tab.name}
-                        onClick={() => setActiveTab(tab.name)}
-                        className={`py-3 px-4 text-sm font-semibold flex-shrink-0 transition-colors ${
-                            activeTab === tab.name
-                                ? 'border-b-2 border-primary text-primary'
-                                : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                        }`}
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex-1 min-w-fit px-4 py-2.5 rounded-md font-semibold text-sm transition-all ${activeTab === tab.id
+                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                            }`}
                     >
-                        {tab.name} <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-200 dark:bg-gray-700">{tab.count}</span>
+                        {tab.label} {tab.count > 0 && <span className="ml-1 text-xs">{tab.count}</span>}
                     </button>
                 ))}
             </div>
 
-            <div>
-                {renderContent()}
+            {/* Content */}
+            <div className="space-y-4">
+                {/* Bill Payments Tab */}
+                {activeTab === 'bill-payments' && (
+                    <>
+                        {pendingBillPayments.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-12 text-center">
+                                <CheckCircleIcon className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                                <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-400">No Pending Bill Payments</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">All bill payments have been processed.</p>
+                            </div>
+                        ) : (
+                            pendingBillPayments.map(({ bill, share }) => (
+                                <div key={`${bill.id}-${share.userId}`} className="bg-slate-800 dark:bg-slate-800/80 rounded-lg p-5 border border-slate-700">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-3">
+                                            <div className="p-2 bg-slate-700 rounded-lg">
+                                                {categoryIcons[bill.category] || <OtherIcon className="w-5 h-5 text-slate-400" />}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white flex items-center gap-2">
+                                                    {bill.category} Bill - {share.userName}
+                                                </h3>
+                                                <p className="text-sm text-slate-400 mt-1">
+                                                    Amount: <span className="font-bold text-white font-numeric">৳{share.amount.toFixed(0)}</span>
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Marked as paid {new Date(bill.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({Math.ceil((new Date().getTime() - new Date(bill.dueDate).getTime()) / (1000 * 60 * 60 * 24))} days ago)
+                                                </p>
+                                                <p className="text-xs text-warning-500 mt-1">Status: Waiting for your approval</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleDenyBill(bill.id, share.userId)}
+                                                className="px-4 py-2 bg-danger-500/20 text-danger-400 rounded-lg font-semibold hover:bg-danger-500/30 transition-colors text-sm"
+                                            >
+                                                Deny
+                                            </button>
+                                            <button
+                                                onClick={() => handleApproveBill(bill.id, share.userId)}
+                                                className="px-4 py-2 bg-success-500/20 text-success-400 rounded-lg font-semibold hover:bg-success-500/30 transition-colors text-sm"
+                                            >
+                                                Approve Payment
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
+
+                {/* Shopping Tab */}
+                {activeTab === 'shopping' && (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-12 text-center">
+                        <CheckCircleIcon className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-400">No Pending Shopping Expenses</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">All shopping expenses have been processed.</p>
+                    </div>
+                )}
+
+                {/* Deposits Tab */}
+                {activeTab === 'deposits' && (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-12 text-center">
+                        <CheckCircleIcon className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-400">No Pending Deposits</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">All deposits have been processed.</p>
+                    </div>
+                )}
+
+                {/* Meal Entries Tab */}
+                {activeTab === 'meal-entries' && (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-12 text-center">
+                        <CheckCircleIcon className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                        <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-400">No Pending Meal Entries</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">All meal entries have been processed.</p>
+                    </div>
+                )}
+
+                {/* Join Requests Tab */}
+                {activeTab === 'join-requests' && (
+                    <>
+                        {pendingMemberRequests.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-12 text-center">
+                                <CheckCircleIcon className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+                                <h3 className="text-lg font-semibold text-slate-600 dark:text-slate-400">No Pending Join Requests</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">All join requests have been processed.</p>
+                            </div>
+                        ) : (
+                            pendingMemberRequests.map(req => (
+                                <div key={req.id} className="bg-slate-800 dark:bg-slate-800/80 rounded-lg p-5 border border-slate-700">
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center text-primary-400 font-bold text-lg">
+                                                {req.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white">{req.name}</h3>
+                                                <p className="text-sm text-slate-400 mt-1">{req.email}</p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Requested: {new Date(req.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button className="px-4 py-2 bg-danger-500/20 text-danger-400 rounded-lg font-semibold hover:bg-danger-500/30 transition-colors text-sm">
+                                                Deny
+                                            </button>
+                                            <button
+                                                onClick={() => handleApproveMember(req.id)}
+                                                className="px-4 py-2 bg-success-500/20 text-success-400 rounded-lg font-semibold hover:bg-success-500/30 transition-colors text-sm"
+                                            >
+                                                Approve
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </>
+                )}
             </div>
         </div>
     );
 };
 
 export default PendingApprovalsPage;
+

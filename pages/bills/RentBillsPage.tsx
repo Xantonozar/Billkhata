@@ -15,7 +15,13 @@ const statusClasses: Record<PaymentStatus, { bg: string, text: string, border: s
     'Overdue': { bg: 'bg-danger-500/10', text: 'text-danger-600 dark:text-danger-400', border: 'border-danger-500/30' },
 };
 
-const RentCard: React.FC<{ bill: Bill, role: Role, onEdit: (bill: Bill) => void }> = ({ bill, role, onEdit }) => {
+const RentCard: React.FC<{
+    bill: Bill,
+    role: Role,
+    onEdit: (bill: Bill) => void,
+    onApprove: (billId: string, userId: string) => void,
+    onDeny: (billId: string, userId: string) => void
+}> = ({ bill, role, onEdit, onApprove, onDeny }) => {
     const share = bill.shares[0];
     const statusInfo = statusClasses[share.status];
 
@@ -23,7 +29,7 @@ const RentCard: React.FC<{ bill: Bill, role: Role, onEdit: (bill: Bill) => void 
         <div className={`p-4 rounded-lg border ${statusInfo.border} ${statusInfo.bg}`}>
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
-                    <UserCircleIcon className="w-10 h-10 text-slate-400"/>
+                    <UserCircleIcon className="w-10 h-10 text-slate-400" />
                     <div>
                         <p className="font-bold text-slate-800 dark:text-white">{share.userName}</p>
                         <p className={`text-sm font-semibold ${statusInfo.text}`}>{share.status}</p>
@@ -38,11 +44,21 @@ const RentCard: React.FC<{ bill: Bill, role: Role, onEdit: (bill: Bill) => void 
                 <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700/50 flex justify-end gap-2">
                     {share.status === 'Pending Approval' && (
                         <>
-                            <button className="px-3 py-1 text-xs font-semibold bg-danger-500/10 text-danger-600 rounded-md hover:bg-danger-500/20 transition-all active:scale-95">Deny</button>
-                            <button className="px-3 py-1 text-xs font-semibold bg-success-500/10 text-success-600 rounded-md hover:bg-success-500/20 transition-all active:scale-95">Approve</button>
+                            <button
+                                onClick={() => onDeny(bill.id, share.userId)}
+                                className="px-3 py-1 text-xs font-semibold bg-danger-500/10 text-danger-600 rounded-md hover:bg-danger-500/20 transition-all active:scale-95"
+                            >
+                                Deny
+                            </button>
+                            <button
+                                onClick={() => onApprove(bill.id, share.userId)}
+                                className="px-3 py-1 text-xs font-semibold bg-success-500/10 text-success-600 rounded-md hover:bg-success-500/20 transition-all active:scale-95"
+                            >
+                                Approve
+                            </button>
                         </>
                     )}
-                     {share.status === 'Overdue' && (
+                    {share.status === 'Overdue' && (
                         <button className="px-3 py-1 text-xs font-semibold border border-primary-500 text-primary-600 rounded-md hover:bg-primary-500/10 transition-all active:scale-95">Send Reminder</button>
                     )}
                     <button onClick={() => onEdit(bill)} className="px-3 py-1 text-xs font-semibold border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95">Edit</button>
@@ -54,7 +70,7 @@ const RentCard: React.FC<{ bill: Bill, role: Role, onEdit: (bill: Bill) => void 
 
 const getPastSixMonths = () => {
     const months = [];
-    const date = new Date(2025, 9, 1); // Mock current date: October 2025
+    const date = new Date(); // Use current date
     for (let i = 0; i < 6; i++) {
         const d = new Date(date);
         d.setMonth(d.getMonth() - i);
@@ -72,7 +88,7 @@ const RentBillsPage: React.FC = () => {
     const [editingRentBill, setEditingRentBill] = useState<Bill | null>(null);
     const [isPushModalOpen, setIsPushModalOpen] = useState(false);
     const { addToast } = useNotifications();
-    
+
     const [availableMonths] = useState<string[]>(getPastSixMonths());
     const [selectedMonth, setSelectedMonth] = useState<string>(availableMonths[0]);
 
@@ -91,7 +107,7 @@ const RentBillsPage: React.FC = () => {
 
         const [monthStr, yearStr] = selectedMonth.split(' ');
         const year = parseInt(yearStr, 10);
-        const monthIndex = new Date(Date.parse(monthStr +" 1, 2012")).getMonth();
+        const monthIndex = new Date(Date.parse(monthStr + " 1, 2012")).getMonth();
 
         return rentBills.filter(bill => {
             const billDate = new Date(bill.dueDate);
@@ -103,14 +119,34 @@ const RentBillsPage: React.FC = () => {
         if (!confirmingPayment || !user) return;
 
         const updatedBill = await api.updateBillShareStatus(confirmingPayment.id, user.id, 'Pending Approval');
-        
+
         if (updatedBill) {
-            setRentBills(prevBills => 
+            setRentBills(prevBills =>
                 prevBills.map(b => b.id === updatedBill.id ? updatedBill : b)
             );
             addToast({ type: 'success', title: 'Payment Sent', message: 'Your payment is now pending approval.' });
         }
         setConfirmingPayment(null);
+    };
+
+    const handleApprovePayment = async (billId: string, userId: string) => {
+        const updatedBill = await api.updateBillShareStatus(billId, userId, 'Paid');
+        if (updatedBill) {
+            setRentBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
+            addToast({ type: 'success', title: 'Approved', message: 'Rent payment approved successfully.' });
+        } else {
+            addToast({ type: 'error', title: 'Error', message: 'Failed to approve payment.' });
+        }
+    };
+
+    const handleDenyPayment = async (billId: string, userId: string) => {
+        const updatedBill = await api.updateBillShareStatus(billId, userId, 'Unpaid');
+        if (updatedBill) {
+            setRentBills(prev => prev.map(b => b.id === updatedBill.id ? updatedBill : b));
+            addToast({ type: 'info', title: 'Denied', message: 'Rent payment rejected. Status reset to Unpaid.' });
+        } else {
+            addToast({ type: 'error', title: 'Error', message: 'Failed to deny payment.' });
+        }
     };
 
     const handleBillUpdate = (updatedBill: Bill) => {
@@ -125,7 +161,7 @@ const RentBillsPage: React.FC = () => {
 
     const handleConfirmPush = (data: { rentData: { userId: string; userName: string; amount: number }[], month: string; dueDate: string; }) => {
         const { rentData, month, dueDate } = data;
-        
+
         const newBills: Bill[] = rentData.map((rent) => ({
             id: `rent-${month.toLowerCase().split(' ')[0]}-${rent.userId}`,
             khataId: user!.khataId!,
@@ -141,7 +177,7 @@ const RentBillsPage: React.FC = () => {
                 status: 'Unpaid'
             }]
         }));
-    
+
         setRentBills(prev => [...newBills, ...prev]);
         addToast({ type: 'success', title: 'Bills Created', message: `${month} rent bills have been pushed to all members.` });
     };
@@ -153,7 +189,7 @@ const RentBillsPage: React.FC = () => {
         <div>
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold font-sans text-slate-800 dark:text-white">{selectedMonth} Rent Status</h2>
-                <button 
+                <button
                     onClick={() => setIsPushModalOpen(true)}
                     className="px-4 py-2 text-sm font-semibold bg-primary-500 text-white rounded-lg hover:bg-primary-600 shadow-sm transition-all active:scale-95"
                 >
@@ -161,15 +197,24 @@ const RentBillsPage: React.FC = () => {
                 </button>
             </div>
             <div className="space-y-4">
-                {selectedMonthBills.map(bill => <RentCard key={bill.id} bill={bill} role={user.role} onEdit={setEditingRentBill} />)}
+                {selectedMonthBills.map(bill => (
+                    <RentCard
+                        key={bill.id}
+                        bill={bill}
+                        role={user.role}
+                        onEdit={setEditingRentBill}
+                        onApprove={handleApprovePayment}
+                        onDeny={handleDenyPayment}
+                    />
+                ))}
             </div>
         </div>
     );
-    
+
     const renderMemberView = () => {
         const myRentBill = selectedMonthBills.find(b => b.shares[0]?.userId === user.id);
         if (!myRentBill) {
-             return (
+            return (
                 <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                     <p className="text-lg text-slate-600 dark:text-slate-300">Your rent details for {selectedMonth} are not available.</p>
                 </div>
@@ -179,21 +224,21 @@ const RentBillsPage: React.FC = () => {
         const statusInfo = statusClasses[share.status];
         const canPay = share.status === 'Unpaid' || share.status === 'Overdue';
         return (
-             <div className={`p-6 rounded-xl border-2 ${statusInfo.border} ${statusInfo.bg}`}>
+            <div className={`p-6 rounded-xl border-2 ${statusInfo.border} ${statusInfo.bg}`}>
                 <p className="text-sm font-semibold">{selectedMonth}</p>
                 <p className="text-3xl font-bold text-slate-800 dark:text-white mt-1 font-numeric">৳{share.amount.toFixed(2)}</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Due: {myRentBill.dueDate}</p>
-                 <div className="mt-4 flex items-center gap-4">
-                     <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusInfo.bg} ${statusInfo.text}`}>{share.status}</span>
-                     {canPay ? (
-                        <button 
+                <div className="mt-4 flex items-center gap-4">
+                    <span className={`px-3 py-1 text-sm font-bold rounded-full ${statusInfo.bg} ${statusInfo.text}`}>{share.status}</span>
+                    {canPay ? (
+                        <button
                             onClick={() => setConfirmingPayment(myRentBill)}
                             className="px-4 py-2 bg-gradient-success text-white font-semibold rounded-md hover:shadow-lg transition-all active:scale-[0.98]">
-                                Pay Now
+                            Pay Now
                         </button>
-                     ) : null}
-                 </div>
-             </div>
+                    ) : null}
+                </div>
+            </div>
         );
     };
 
@@ -203,11 +248,11 @@ const RentBillsPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                         <button onClick={() => setPage('bills')} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
-                            <ArrowLeftIcon className="w-6 h-6 text-slate-600 dark:text-slate-300"/>
+                            <ArrowLeftIcon className="w-6 h-6 text-slate-600 dark:text-slate-300" />
                         </button>
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-sans">Rent Bills</h1>
                     </div>
-                     <select
+                    <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
                         className="px-4 py-2 text-sm font-semibold bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"
@@ -219,16 +264,16 @@ const RentBillsPage: React.FC = () => {
                 </div>
 
                 {selectedMonthBills.length === 0 ? (
-                     <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    <div className="text-center py-12 bg-white dark:bg-slate-800 rounded-lg shadow-sm">
                         <h3 className="text-lg font-medium font-sans text-slate-900 dark:text-white">No rent bills found for {selectedMonth}.</h3>
                         {user.role === Role.Manager && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Click "Push Next Month's Bills" to create them.</p>}
                     </div>
                 ) : (
-                     user.role === Role.Manager ? renderManagerView() : renderMemberView()
+                    user.role === Role.Manager ? renderManagerView() : renderMemberView()
                 )}
 
             </div>
-            
+
             {editingRentBill && (
                 <EditRentBillModal
                     billToEdit={editingRentBill}
@@ -238,24 +283,24 @@ const RentBillsPage: React.FC = () => {
             )}
 
             {confirmingPayment && (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
                     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm animate-scale-in">
                         <h3 className="text-lg font-bold font-sans text-slate-900 dark:text-white">Confirm Payment</h3>
                         <div className="mt-4 mb-6 text-sm text-slate-600 dark:text-slate-300">
-                             <p>Bill: <span className="font-semibold">{confirmingPayment.title}</span></p>
-                             <p>Amount to Pay: <span className="font-semibold font-numeric">৳{confirmingPayment.shares.find(s => s.userId === user?.id)?.amount.toFixed(2)}</span></p>
-                             <p className="mt-4 p-2 bg-warning-500/10 text-warning-600 dark:text-warning-400 rounded-md">
-                                 ⚠️ This will be sent to the manager for approval.
-                             </p>
+                            <p>Bill: <span className="font-semibold">{confirmingPayment.title}</span></p>
+                            <p>Amount to Pay: <span className="font-semibold font-numeric">৳{confirmingPayment.shares.find(s => s.userId === user?.id)?.amount.toFixed(2)}</span></p>
+                            <p className="mt-4 p-2 bg-warning-500/10 text-warning-600 dark:text-warning-400 rounded-md">
+                                ⚠️ This will be sent to the manager for approval.
+                            </p>
                         </div>
                         <div className="flex justify-end gap-3">
-                            <button 
+                            <button
                                 onClick={() => setConfirmingPayment(null)}
                                 className="px-4 py-2 bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-slate-200 font-semibold rounded-md hover:bg-slate-300 dark:hover:bg-slate-500 transition-all active:scale-95"
                             >
                                 Cancel
                             </button>
-                            <button 
+                            <button
                                 onClick={handleMarkAsPaid}
                                 className="px-4 py-2 bg-gradient-success text-white font-semibold rounded-md hover:shadow-lg transition-all active:scale-95"
                             >

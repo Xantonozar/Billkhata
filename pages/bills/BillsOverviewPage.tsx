@@ -39,11 +39,35 @@ const BillsOverviewPage: React.FC = () => {
     }, [user]);
 
     const monthSummary = useMemo(() => {
-        const userBills = bills.flatMap(b => b.shares.filter(s => s.userId === user?.id));
-        const totalShare = userBills.reduce((acc, share) => acc + share.amount, 0);
-        const paidShare = userBills.filter(s => s.status === 'Paid').reduce((acc, share) => acc + share.amount, 0);
-        const dueShare = totalShare - paidShare;
-        return { totalShare, paidShare, dueShare };
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const currentMonthBills = bills.filter(bill => {
+            const billDate = new Date(bill.dueDate);
+            return billDate.getMonth() === currentMonth && billDate.getFullYear() === currentYear;
+        });
+
+        if (user?.role === Role.Manager) {
+            // Manager sees total for the room
+            const totalAmount = currentMonthBills.reduce((acc, bill) => acc + bill.totalAmount, 0);
+
+            // Calculate paid amount based on individual shares that are 'Paid'
+            const paidAmount = currentMonthBills.reduce((acc, bill) => {
+                const billPaid = bill.shares.filter(s => s.status === 'Paid').reduce((sum, s) => sum + s.amount, 0);
+                return acc + billPaid;
+            }, 0);
+
+            const dueAmount = totalAmount - paidAmount;
+            return { total: totalAmount, paid: paidAmount, due: dueAmount, label: 'Room Summary (This Month)' };
+        } else {
+            // Member sees only their share
+            const myShares = currentMonthBills.flatMap(b => b.shares.filter(s => s.userId === user?.id));
+            const totalShare = myShares.reduce((acc, share) => acc + share.amount, 0);
+            const paidShare = myShares.filter(s => s.status === 'Paid').reduce((acc, share) => acc + share.amount, 0);
+            const dueShare = totalShare - paidShare;
+            return { total: totalShare, paid: paidShare, due: dueShare, label: 'My Summary (This Month)' };
+        }
     }, [bills, user]);
 
     const billsByCategory = useMemo(() => {
@@ -56,40 +80,38 @@ const BillsOverviewPage: React.FC = () => {
     if (loading) {
         return <div className="text-center p-8">Loading...</div>;
     }
-    
+
     if (!user) return null;
 
     return (
         <div className="space-y-6">
-             <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-sans">Bills Overview</h1>
-            
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white font-sans">Bills Overview</h1>
+
             {/* This Month Summary Card */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-md">
-                 <h2 className="text-xl font-bold font-sans text-slate-800 dark:text-white mb-4">This Month Summary</h2>
-                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                <h2 className="text-xl font-bold font-sans text-slate-800 dark:text-white mb-4">{monthSummary.label}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                     <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Total Bills</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white font-numeric">৳{monthSummary.totalShare.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white font-numeric">৳{monthSummary.total.toFixed(2)}</p>
                     </div>
-                     <div>
+                    <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Paid</p>
-                        <p className="text-2xl font-bold text-success-600 dark:text-success-400 font-numeric">৳{monthSummary.paidShare.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-success-600 dark:text-success-400 font-numeric">৳{monthSummary.paid.toFixed(2)}</p>
                     </div>
-                     <div>
+                    <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Due</p>
-                        <p className="text-2xl font-bold text-danger-600 dark:text-danger-400 font-numeric">৳{monthSummary.dueShare.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-danger-600 dark:text-danger-400 font-numeric">৳{monthSummary.due.toFixed(2)}</p>
                     </div>
-                 </div>
+                </div>
             </div>
 
             {/* Bill Category Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.entries(billsByCategory).map(([category, categoryBills]) => {
-                    // FIX: When using Object.entries, TypeScript may infer the value as `unknown`.
-                    // Cast `categoryBills` to `Bill[]` to access array methods safely.
-                    const totalAmount = (categoryBills as Bill[]).reduce((sum, bill) => sum + bill.totalAmount, 0);
-                    const yourShare = (categoryBills as Bill[]).flatMap(b => b.shares).filter(s => s.userId === user.id).reduce((sum, s) => sum + s.amount, 0);
-                    const latestBill = [...(categoryBills as Bill[])].sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())[0];
+                {Object.entries(billsByCategory).map(([category, categoryBills]: [string, Bill[]]) => {
+                    const totalAmount = categoryBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+                    const yourShare = categoryBills.flatMap(b => b.shares).filter(s => s.userId === user.id).reduce((sum, s) => sum + s.amount, 0);
+                    const latestBill = [...categoryBills].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())[0];
                     const myShareDetails = latestBill?.shares.find(s => s.userId === user.id);
 
                     return (
@@ -102,11 +124,11 @@ const BillsOverviewPage: React.FC = () => {
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Total: <span className="font-semibold font-numeric">৳{totalAmount.toFixed(2)}</span></p>
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Your Share: <span className="font-semibold font-numeric">৳{yourShare.toFixed(2)}</span></p>
                                 {myShareDetails && (
-                                     <div className="mt-2">
+                                    <div className="mt-2">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColors[myShareDetails.status]}`}>
                                             {myShareDetails.status}
                                         </span>
-                                     </div>
+                                    </div>
                                 )}
                                 {latestBill && <p className="text-xs text-slate-400 mt-2">Last due: {latestBill.dueDate}</p>}
                             </div>

@@ -19,12 +19,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
     setError('');
     setLoading(true);
     try {
-      const user = await login(email, password);
-      if (!user) {
-        setError('Invalid email or password.');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
+      await login(email, password);
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -35,26 +32,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
       {/* Left Panel */}
       <div className="hidden lg:flex w-2/5 bg-primary-600 items-center justify-center p-12 text-white flex-col relative">
         <div className="absolute top-8 left-8">
-            <button onClick={onNavigateToHome} className="flex items-center space-x-2 opacity-70 hover:opacity-100 transition-opacity">
-                <HomeIcon className="w-6 h-6"/>
-                <span>Home</span>
-            </button>
+          <button onClick={onNavigateToHome} className="flex items-center space-x-2 opacity-70 hover:opacity-100 transition-opacity">
+            <HomeIcon className="w-6 h-6" />
+            <span>Home</span>
+          </button>
         </div>
         <div className="text-center">
-            <SparklesIcon className="w-24 h-24 mx-auto mb-6 opacity-80" />
-            <h1 className="text-4xl font-bold">Welcome Back</h1>
-            <p className="mt-4 text-lg opacity-80">
-              Manage your shared expenses with ease. Log in to continue where you left off.
-            </p>
+          <SparklesIcon className="w-24 h-24 mx-auto mb-6 opacity-80" />
+          <h1 className="text-4xl font-bold">Welcome Back</h1>
+          <p className="mt-4 text-lg opacity-80">
+            Manage your shared expenses with ease. Log in to continue where you left off.
+          </p>
         </div>
       </div>
 
       {/* Right Panel (Form) */}
       <div className="w-full lg:w-3/5 flex items-center justify-center p-6 sm:p-12">
         <div className="max-w-md w-full">
-            <div className="lg:hidden text-center mb-8">
-                <h1 className="text-center text-4xl font-bold text-primary-600">BillKhata</h1>
-            </div>
+          <div className="lg:hidden text-center mb-8">
+            <h1 className="text-center text-4xl font-bold text-primary-600">BillKhata</h1>
+          </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
             Log in to your account
           </h2>
@@ -79,7 +76,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
               </div>
 
               <div>
-                <label htmlFor="password"className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                   Password
                 </label>
                 <div className="mt-1">
@@ -95,7 +92,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onNavigateToSignUp, onNavigateToH
                   />
                 </div>
               </div>
-              
+
               {error && <p className="text-sm text-red-500">{error}</p>}
 
               <div>

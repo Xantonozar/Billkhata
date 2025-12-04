@@ -5,45 +5,43 @@ import { ShoppingCartIcon, ArrowLeftIcon, CameraIcon, FolderIcon, CheckCircleIco
 import { useNotifications } from '../contexts/NotificationContext';
 import { api } from '../services/api';
 
-// ShoppingDuty interface to strongly type the roster data
+// MOCK DATA based on wireframes
+// FIX: Added ShoppingDuty interface to strongly type the roster data, resolving type errors when iterating over it.
 interface ShoppingDuty {
     name: string;
     status: string;
     amount: number;
 }
 
-// Empty initial roster structure - will be populated from database
-const emptyRoster: Record<string, ShoppingDuty> = {
-    'Monday': { name: '', status: 'Upcoming', amount: 0 },
-    'Tuesday': { name: '', status: 'Upcoming', amount: 0 },
-    'Wednesday': { name: '', status: 'Upcoming', amount: 0 },
-    'Thursday': { name: '', status: 'Upcoming', amount: 0 },
-    'Friday': { name: '', status: 'Upcoming', amount: 0 },
-    'Saturday': { name: '', status: 'Upcoming', amount: 0 },
-    'Sunday': { name: '', status: 'Upcoming', amount: 0 },
-};
-
 const mockShoppingDutyData: Record<string, ShoppingDuty> = {
-    'Monday': { name: 'Priya', status: 'Assigned', amount: 0 },
-    'Tuesday': { name: 'Raj', status: 'Assigned', amount: 0 },
-    'Wednesday': { name: '', status: 'Upcoming', amount: 0 },
-    'Thursday': { name: 'Amit', status: 'Assigned', amount: 0 },
-    'Friday': { name: '', status: 'Upcoming', amount: 0 },
-    'Saturday': { name: 'Deepa', status: 'Assigned', amount: 0 },
-    'Sunday': { name: 'Rohit', status: 'Assigned', amount: 0 },
+    'Monday': { name: 'Raj', status: 'Completed', amount: 850 },
+    'Tuesday': { name: 'Amit', status: 'Assigned', amount: 0 },
+    'Wednesday': { name: 'Priya', status: 'Upcoming', amount: 0 },
+    'Thursday': { name: 'Ravi', status: 'Upcoming', amount: 0 },
+    'Friday': { name: 'Raj', status: 'Upcoming', amount: 0 },
 };
 
-const initialFundStatus = {
-    totalDeposits: 0,
-    totalShopping: 0,
-    balance: 0,
-    rate: 0,
+const mockFundStatus = {
+    totalDeposits: 12000,
+    totalShopping: 8460,
+    balance: 3540,
+    rate: 45.50,
 };
 
-const initialMemberSummary = {
-    totalDeposits: 0,
-    mealCost: 0,
-    refundable: 0,
+const initialPendingApprovals = {
+    deposits: [
+        { id: 'd1', name: 'Amit', amount: 1500, method: 'Nagad', date: 'Oct 8', trxId: 'TRX12345' },
+        { id: 'd2', name: 'Priya', amount: 1500, method: 'bKash', date: 'Oct 8', trxId: 'TRX98765' }
+    ],
+    expenses: [
+        { id: 'e1', name: 'Raj', amount: 850, date: 'Oct 7', items: 'Rice, vegetables' }
+    ]
+};
+
+const mockMemberSummary = {
+    totalDeposits: 3000,
+    mealCost: 2548,
+    refundable: 452,
 };
 
 const mockDepositHistory = [
@@ -70,28 +68,15 @@ const EditRosterModal: React.FC<EditRosterModalProps> = ({ onClose, roster, memb
     const [editedRoster, setEditedRoster] = useState(roster);
 
     const handleAssignmentChange = (day: string, newName: string) => {
-        setEditedRoster(prev => {
-            const currentDuty = prev[day];
-            const isUnassigning = newName === '';
-            const isNameChanged = currentDuty.name !== newName;
-
-            let newStatus = currentDuty.status;
-            if (isUnassigning) {
-                newStatus = 'Upcoming';
-            } else if (isNameChanged) {
-                newStatus = 'Assigned';
+        setEditedRoster(prev => ({
+            ...prev,
+            [day]: {
+                ...prev[day],
+                name: newName,
+                status: prev[day].name === newName ? prev[day].status : 'Assigned',
+                amount: prev[day].name === newName ? prev[day].amount : 0
             }
-
-            return {
-                ...prev,
-                [day]: {
-                    ...currentDuty,
-                    name: newName,
-                    status: newStatus,
-                    amount: isNameChanged ? 0 : currentDuty.amount
-                }
-            };
-        });
+        }));
     };
 
     const handleSaveChanges = () => {
@@ -106,6 +91,7 @@ const EditRosterModal: React.FC<EditRosterModalProps> = ({ onClose, roster, memb
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><XIcon className="w-5 h-5" /></button>
                 </div>
                 <div className="space-y-4">
+                    {/* FIX: Cast `duty` to `ShoppingDuty` to resolve type inference issues with `Object.entries`. */}
                     {Object.entries(editedRoster).map(([day, duty]) => {
                         const shoppingDuty = duty as ShoppingDuty;
                         return (
@@ -133,40 +119,14 @@ const EditRosterModal: React.FC<EditRosterModalProps> = ({ onClose, roster, memb
 };
 
 
-
 const AddDepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> = ({ onClose, onSubmit }) => {
-    const { user } = useAuth();
-    const { addToast } = useNotifications();
     const [amount, setAmount] = useState('1500');
     const [method, setMethod] = useState('bKash');
-    const [transactionId, setTransactionId] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (!user?.khataId) {
-            addToast({ type: 'error', title: 'Error', message: 'User not found' });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            await api.createDeposit(user.khataId, {
-                amount: parseFloat(amount),
-                paymentMethod: method,
-                transactionId,
-                screenshotUrl: '' // TODO: implement file upload
-            });
-
-            addToast({ type: 'success', title: 'Deposit Submitted', message: 'Your deposit is now pending manager approval.' });
-            onSubmit();
-            onClose();
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Error', message: error.response?.data?.message || 'Failed to submit deposit' });
-        } finally {
-            setIsSubmitting(false);
-        }
+        onSubmit();
+        onClose();
     };
 
     return (
@@ -195,13 +155,7 @@ const AddDepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> =
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Transaction ID (optional):</label>
-                        <input
-                            type="text"
-                            placeholder="TRX12345678"
-                            value={transactionId}
-                            onChange={(e) => setTransactionId(e.target.value)}
-                            className="w-full mt-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors"
-                        />
+                        <input type="text" placeholder="TRX12345678" className="w-full mt-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary transition-colors" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Upload Screenshot (optional):</label>
@@ -210,13 +164,7 @@ const AddDepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> =
                             <button type="button" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"><FolderIcon className="w-5 h-5" />Gallery</button>
                         </div>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full mt-2 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
-                    </button>
+                    <button type="submit" className="w-full mt-2 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Submit for Approval</button>
                 </form>
             </div>
         </div>
@@ -224,38 +172,14 @@ const AddDepositModal: React.FC<{ onClose: () => void, onSubmit: () => void }> =
 }
 
 const AddExpenseModal: React.FC<{ onClose: () => void; onSubmit: () => void }> = ({ onClose, onSubmit }) => {
-    const { user } = useAuth();
-    const { addToast } = useNotifications();
     const [amount, setAmount] = useState('');
     const [items, setItems] = useState('');
     const [notes, setNotes] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (!user?.khataId) {
-            addToast({ type: 'error', title: 'Error', message: 'User not found' });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            await api.createExpense(user.khataId, {
-                amount: parseFloat(amount),
-                items,
-                notes,
-                receiptUrl: '' // TODO: implement file upload
-            });
-
-            addToast({ type: 'success', title: 'Expense Submitted', message: 'Your shopping expense is now pending manager approval.' });
-            onSubmit();
-            onClose();
-        } catch (error: any) {
-            addToast({ type: 'error', title: 'Error', message: error.response?.data?.message || 'Failed to submit expense' });
-        } finally {
-            setIsSubmitting(false);
-        }
+        onSubmit();
+        onClose();
     };
 
     return (
@@ -288,13 +212,7 @@ const AddExpenseModal: React.FC<{ onClose: () => void; onSubmit: () => void }> =
                             <button type="button" className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"><FolderIcon className="w-5 h-5" />Gallery</button>
                         </div>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="w-full mt-2 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
-                    </button>
+                    <button type="submit" className="w-full mt-2 py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-600">Submit for Approval</button>
                 </form>
             </div>
         </div>
@@ -306,27 +224,19 @@ const AddExpenseModal: React.FC<{ onClose: () => void; onSubmit: () => void }> =
 
 const ManagerShoppingView: React.FC = () => {
     const { user } = useAuth();
-    const [pendingDeposits, setPendingDeposits] = useState<any[]>([]);
-    const [pendingExpenses, setPendingExpenses] = useState<any[]>([]);
+    const [approvals, setApprovals] = useState(initialPendingApprovals);
     const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
-    const [roster, setRoster] = useState(emptyRoster);
+    const [roster, setRoster] = useState(mockShoppingDutyData);
     const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
-    const [fundStatus, setFundStatus] = useState(initialFundStatus);
     const { addToast } = useNotifications();
 
     useEffect(() => {
         if (user?.khataId) {
-            // Fetch summary
-            api.getShoppingSummary(user.khataId).then(data => {
-                if (data && data.fundStatus) {
-                    setFundStatus(data.fundStatus);
-                }
-            });
             // Fetch roster
             api.getShoppingRoster(user.khataId).then(items => {
                 if (items && items.length > 0) {
                     // Convert array to object keyed by day
-                    const newRoster = { ...emptyRoster };
+                    const newRoster = { ...mockShoppingDutyData };
                     items.forEach((item: any) => {
                         if (newRoster[item.day]) {
                             newRoster[item.day] = {
@@ -344,62 +254,16 @@ const ManagerShoppingView: React.FC = () => {
             api.getShoppingMembers(user.khataId).then(m => {
                 setMembers(m);
             });
-
-            // Fetch deposits
-            api.getDeposits(user.khataId).then(deposits => {
-                const pending = deposits.filter((d: any) => d.status === 'Pending');
-                setPendingDeposits(pending);
-            });
-
-            // Fetch expenses
-            api.getExpenses(user.khataId).then(expenses => {
-                const pending = expenses.filter((e: any) => e.status === 'Pending');
-                setPendingExpenses(pending);
-            });
         }
     }, [user?.khataId]);
 
-    const handleDepositAction = async (id: string, action: 'approve' | 'deny') => {
-        if (!user?.khataId) return;
-
-        let success = false;
+    const handleAction = (type: 'deposits' | 'expenses', id: string, action: 'approve' | 'deny') => {
+        const item = approvals[type].find(i => i.id === id);
+        setApprovals(prev => ({ ...prev, [type]: prev[type].filter(item => item.id !== id) }));
         if (action === 'approve') {
-            success = await api.approveDeposit(user.khataId, id);
+            addToast({ type: 'success', title: 'Approved', message: `${type === 'deposits' ? 'Deposit from' : 'Expense by'} ${item?.name} has been approved.` });
         } else {
-            success = await api.rejectDeposit(user.khataId, id, 'Denied by manager');
-        }
-
-        if (success) {
-            setPendingDeposits(prev => prev.filter(d => d._id !== id));
-            addToast({
-                type: action === 'approve' ? 'success' : 'error',
-                title: action === 'approve' ? 'Approved' : 'Denied',
-                message: `Deposit has been ${action === 'approve' ? 'approved' : 'denied'}.`
-            });
-        } else {
-            addToast({ type: 'error', title: 'Error', message: 'Failed to update deposit status.' });
-        }
-    };
-
-    const handleExpenseAction = async (id: string, action: 'approve' | 'deny') => {
-        if (!user?.khataId) return;
-
-        let success = false;
-        if (action === 'approve') {
-            success = await api.approveExpense(user.khataId, id);
-        } else {
-            success = await api.rejectExpense(user.khataId, id, 'Denied by manager');
-        }
-
-        if (success) {
-            setPendingExpenses(prev => prev.filter(e => e._id !== id));
-            addToast({
-                type: action === 'approve' ? 'success' : 'error',
-                title: action === 'approve' ? 'Approved' : 'Denied',
-                message: `Expense has been ${action === 'approve' ? 'approved' : 'denied'}.`
-            });
-        } else {
-            addToast({ type: 'error', title: 'Error', message: 'Failed to update expense status.' });
+            addToast({ type: 'error', title: 'Denied', message: `${type === 'deposits' ? 'Deposit from' : 'Expense by'} ${item?.name} has been denied.` });
         }
     }
 
@@ -434,12 +298,12 @@ const ManagerShoppingView: React.FC = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
                     <h3 className="font-semibold text-lg mb-3">This Week's Shopping Duty</h3>
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
+                        {/* FIX: Cast `duty` to `ShoppingDuty` to resolve type inference issues with `Object.entries`. */}
                         {Object.entries(roster).map(([day, duty]) => {
                             const shoppingDuty = duty as ShoppingDuty;
-                            const displayName = shoppingDuty.name || 'None';
                             return (
                                 <div key={day} className="flex justify-between items-center">
-                                    <span className="font-medium text-gray-600 dark:text-gray-300">{day}: {displayName}</span>
+                                    <span className="font-medium text-gray-600 dark:text-gray-300">{day}: {shoppingDuty.name}</span>
                                     <span className={`${shoppingDuty.status === 'Completed' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                         {shoppingDuty.status === 'Completed' ? `✅ Completed - ৳${shoppingDuty.amount}` : shoppingDuty.status === 'Assigned' ? '🔄 Assigned' : ''}
                                     </span>
@@ -454,47 +318,47 @@ const ManagerShoppingView: React.FC = () => {
                     <h3 className="font-semibold text-lg mb-3">Fund Status</h3>
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 grid grid-cols-2 gap-4">
                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Deposits</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{fundStatus.totalDeposits.toLocaleString()}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Deposits</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalDeposits}</p>
                         </div>
                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Shopping</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{fundStatus.totalShopping.toLocaleString()}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Total Shopping</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.totalShopping}</p>
                         </div>
                         <div className="p-3 bg-green-50 dark:bg-green-500/10 rounded-md">
-                            <p className="text-sm text-green-600 dark:text-green-300">Fund Balance</p><p className="font-bold text-lg text-green-600 dark:text-green-300">{fundStatus.balance >= 0 ? '+' : ''}৳{fundStatus.balance.toLocaleString()}</p>
+                            <p className="text-sm text-green-600 dark:text-green-300">Fund Balance</p><p className="font-bold text-lg text-green-600 dark:text-green-300">+৳{mockFundStatus.balance}</p>
                         </div>
                         <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Current Rate</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{fundStatus.rate}/qty</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Current Rate</p><p className="font-bold text-lg text-gray-800 dark:text-white">৳{mockFundStatus.rate}/qty</p>
                         </div>
                     </div>
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                    <h3 className="font-semibold text-lg mb-3 text-yellow-600 dark:text-yellow-400">🔔 Pending Approvals ({pendingDeposits.length + pendingExpenses.length})</h3>
+                    <h3 className="font-semibold text-lg mb-3 text-yellow-600 dark:text-yellow-400">🔔 Pending Approvals ({approvals.deposits.length + approvals.expenses.length})</h3>
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-4">
-                        {pendingDeposits.length > 0 && <div>
-                            <h4 className="font-semibold mb-2">💰 Deposits ({pendingDeposits.length})</h4>
-                            {pendingDeposits.map(d => (
-                                <div key={d._id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                    <p className="font-bold">{d.userName} - ৳{d.amount} - {d.paymentMethod}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(d.createdAt).toLocaleDateString()} • {d.transactionId || 'No TRX ID'}</p>
+                        {approvals.deposits.length > 0 && <div>
+                            <h4 className="font-semibold mb-2">💰 Deposits ({approvals.deposits.length})</h4>
+                            {approvals.deposits.map(d => (
+                                <div key={d.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <p className="font-bold">{d.name} - ৳{d.amount} - {d.method}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{d.date} • {d.trxId}</p>
                                     <div className="flex justify-end gap-2 mt-2">
                                         <button className="text-xs font-semibold text-primary hover:underline">View Screenshot</button>
-                                        <button onClick={() => handleDepositAction(d._id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                                        <button onClick={() => handleDepositAction(d._id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                                        <button onClick={() => handleAction('deposits', d.id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
+                                        <button onClick={() => handleAction('deposits', d.id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
                                     </div>
                                 </div>
                             ))}
                         </div>}
-                        {pendingExpenses.length > 0 && <div>
-                            <h4 className="font-semibold mb-2">🛒 Shopping Expenses ({pendingExpenses.length})</h4>
-                            {pendingExpenses.map(e => (
-                                <div key={e._id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                    <p className="font-bold">{e.userName} - ৳{e.amount}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">{new Date(e.createdAt).toLocaleDateString()} • {e.items}</p>
+                        {approvals.expenses.length > 0 && <div>
+                            <h4 className="font-semibold mb-2">🛒 Shopping Expenses ({approvals.expenses.length})</h4>
+                            {approvals.expenses.map(e => (
+                                <div key={e.id} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                    <p className="font-bold">{e.name} - ৳{e.amount}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{e.date} • {e.items}</p>
                                     <div className="flex justify-end gap-2 mt-2">
                                         <button className="text-xs font-semibold text-primary hover:underline">View Receipt</button>
-                                        <button onClick={() => handleExpenseAction(e._id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
-                                        <button onClick={() => handleExpenseAction(e._id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
+                                        <button onClick={() => handleAction('expenses', e.id, 'deny')} className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900">Deny</button>
+                                        <button onClick={() => handleAction('expenses', e.id, 'approve')} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900">Approve</button>
                                     </div>
                                 </div>
                             ))}
@@ -520,69 +384,16 @@ const MemberShoppingView: React.FC = () => {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const { addToast } = useNotifications();
     const [historyTab, setHistoryTab] = useState<'deposits' | 'expenses'>('deposits');
-    const [roster, setRoster] = useState(emptyRoster);
-    const [myDeposits, setMyDeposits] = useState<any[]>([]);
-    const [myExpenses, setMyExpenses] = useState<any[]>([]);
-    const [memberSummary, setMemberSummary] = useState(initialMemberSummary);
 
-    useEffect(() => {
-        if (user?.khataId) {
-            // Fetch summary
-            api.getShoppingSummary(user.khataId).then(data => {
-                if (data && data.memberSummary) {
-                    setMemberSummary(data.memberSummary);
-                }
-            });
-            // Fetch roster for member view
-            api.getShoppingRoster(user.khataId).then(items => {
-                if (items && items.length > 0) {
-                    const newRoster = { ...emptyRoster };
-                    items.forEach((item: any) => {
-                        if (newRoster[item.day]) {
-                            newRoster[item.day] = {
-                                name: item.userName || '',
-                                status: item.status,
-                                amount: item.amount
-                            };
-                        }
-                    });
-                    setRoster(newRoster);
-                }
-            });
-
-            // Fetch my deposits
-            api.getDeposits(user.khataId).then(deposits => {
-                // Filter for my deposits only
-                // Note: The API populates userId, so d.userId is an object. We check d.userId._id
-                // But we also need to handle if population didn't happen or structure is different.
-                // Let's check both d.userId (if string) and d.userId._id (if populated)
-                const myOwn = deposits.filter((d: any) => {
-                    const depositUserId = d.userId?._id || d.userId;
-                    return depositUserId === user.id;
-                });
-                setMyDeposits(myOwn);
-            });
-
-            // Fetch my expenses
-            api.getExpenses(user.khataId).then(expenses => {
-                const myOwn = expenses.filter((e: any) => {
-                    const expenseUserId = e.userId?._id || e.userId;
-                    return expenseUserId === user.id;
-                });
-                setMyExpenses(myOwn);
-            });
-        }
-    }, [user?.khataId, user?.id]);
-
-    // Get current day
-    const dayOrder = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const todayDay = dayOrder[new Date().getDay()];
+    // Mock today is Wednesday, Oct 8, 2025.
+    const todayDay = 'Wednesday';
     const myName = user?.name || '';
 
-    const myDutyToday = roster[todayDay]?.name === myName;
+    const myDutyToday = mockShoppingDutyData[todayDay]?.name === myName;
 
-    const nextDutyDay = Object.entries(roster).find(([day, duty]) => {
-        return (duty as ShoppingDuty).name === myName && dayOrder.indexOf(day) > dayOrder.indexOf(todayDay);
+    const nextDutyDay = Object.entries(mockShoppingDutyData).find(([day, duty]) => {
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        return duty.name === myName && dayOrder.indexOf(day) > dayOrder.indexOf(todayDay);
     });
 
     const dutyText = myDutyToday
@@ -592,28 +403,11 @@ const MemberShoppingView: React.FC = () => {
             : "You have no upcoming shopping duties this week.";
 
     const handleDepositSubmit = () => {
-        // Refresh deposits and summary
-        if (user?.khataId) {
-            api.getDeposits(user.khataId).then(deposits => {
-                const myOwn = deposits.filter((d: any) => (d.userId?._id || d.userId) === user.id);
-                setMyDeposits(myOwn);
-            });
-            api.getShoppingSummary(user.khataId).then(data => {
-                if (data && data.memberSummary) {
-                    setMemberSummary(data.memberSummary);
-                }
-            });
-        }
+        addToast({ type: 'success', title: 'Deposit Submitted', message: 'Your deposit is now pending manager approval.' });
     };
 
     const handleExpenseSubmit = () => {
-        // Refresh expenses
-        if (user?.khataId) {
-            api.getExpenses(user.khataId).then(expenses => {
-                const myOwn = expenses.filter((e: any) => (e.userId?._id || e.userId) === user.id);
-                setMyExpenses(myOwn);
-            });
-        }
+        addToast({ type: 'success', title: 'Expense Submitted', message: 'Your shopping expense is now pending manager approval.' });
     };
 
     return (
@@ -622,29 +416,6 @@ const MemberShoppingView: React.FC = () => {
                 <div className="bg-primary-50 dark:bg-primary-500/10 p-4 rounded-lg text-center">
                     <p className="font-semibold text-primary-700 dark:text-primary-300">{dutyText}</p>
                 </div>
-
-                {/* Weekly Shopping Roster */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-                    <h3 className="font-semibold text-lg mb-3">This Week's Shopping Duty</h3>
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2 text-sm">
-                        {Object.entries(roster).map(([day, duty]) => {
-                            const shoppingDuty = duty as ShoppingDuty;
-                            const displayName = shoppingDuty.name || 'None';
-                            const isMyDuty = shoppingDuty.name === myName;
-                            return (
-                                <div key={day} className={`flex justify-between items-center p-2 rounded ${isMyDuty ? 'bg-primary-50 dark:bg-primary-500/10' : ''}`}>
-                                    <span className={`font-medium ${isMyDuty ? 'text-primary-700 dark:text-primary-300' : 'text-gray-600 dark:text-gray-300'}`}>
-                                        {day}: {displayName} {isMyDuty ? '(You)' : ''}
-                                    </span>
-                                    <span className={`${shoppingDuty.status === 'Completed' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                        {shoppingDuty.status === 'Completed' ? `✅ Completed` : shoppingDuty.status === 'Assigned' ? '🔄 Assigned' : ''}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                     <button onClick={() => setIsDepositModalOpen(true)} className="py-4 text-center bg-white dark:bg-slate-800 rounded-xl shadow-md font-semibold text-slate-700 dark:text-slate-200 hover:scale-105 transition-transform active:scale-95">
                         💰 Add Deposit
@@ -656,11 +427,11 @@ const MemberShoppingView: React.FC = () => {
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md p-6 grid grid-cols-2 divide-x dark:divide-slate-700 text-center">
                     <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Deposit Balance</p>
-                        <p className="text-2xl font-bold text-slate-800 dark:text-white font-numeric">৳{memberSummary.totalDeposits.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white font-numeric">৳{mockMemberSummary.totalDeposits.toLocaleString()}</p>
                     </div>
                     <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Due / Refund</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-400 font-numeric">{memberSummary.refundable >= 0 ? '+' : ''}৳{memberSummary.refundable.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-400 font-numeric">+৳{mockMemberSummary.refundable.toLocaleString()}</p>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md">
@@ -676,38 +447,22 @@ const MemberShoppingView: React.FC = () => {
                     </div>
                     <div className="p-4 space-y-2">
                         {historyTab === 'deposits' && (
-                            myDeposits.length > 0 ? (
-                                myDeposits.map(d => (
-                                    <div key={d._id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
-                                        <span>{new Date(d.createdAt).toLocaleDateString()} - {d.paymentMethod}</span>
-                                        <span className="font-semibold flex items-center gap-1">
-                                            ৳{d.amount.toLocaleString()}
-                                            {d.status === 'Approved' && <CheckCircleIcon className="w-4 h-4 text-green-500" />}
-                                            {d.status === 'Pending' && <span className="text-yellow-500 text-xs">⏳ Pending</span>}
-                                            {d.status === 'Rejected' && <span className="text-red-500 text-xs">❌ Rejected</span>}
-                                        </span>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-center text-gray-500 py-4">No deposit history found.</p>
-                            )
+                            mockDepositHistory.map(d => (
+                                <div key={d.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                                    <span>{d.date} - {d.method}</span>
+                                    <span className="font-semibold flex items-center gap-1">৳{d.amount.toLocaleString()} <CheckCircleIcon className="w-4 h-4 text-green-500" /></span>
+                                </div>
+                            ))
                         )}
                         {historyTab === 'expenses' && (
-                            myExpenses.length > 0 ? (
-                                myExpenses.map(e => (
-                                    <div key={e._id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
-                                        <span>{new Date(e.createdAt).toLocaleDateString()}</span>
-                                        <span className="font-semibold flex items-center gap-1">
-                                            ৳{e.amount.toLocaleString()}
-                                            {e.status === 'Approved' && <span className="text-green-600 dark:text-green-400 text-xs">✅ Approved</span>}
-                                            {e.status === 'Pending' && <span className="text-yellow-600 dark:text-yellow-400 text-xs">⏳ Pending</span>}
-                                            {e.status === 'Rejected' && <span className="text-red-600 dark:text-red-400 text-xs">❌ Rejected</span>}
-                                        </span>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-center text-gray-500 py-4">No expense history found.</p>
-                            )
+                            mockShoppingHistory.map(s => (
+                                <div key={s.id} className="flex justify-between items-center text-sm p-2 bg-slate-50 dark:bg-slate-700/50 rounded-md">
+                                    <span>{s.date}</span>
+                                    <span className={`font-semibold ${s.status === 'Approved' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                        ৳{s.amount.toLocaleString()} {s.status === 'Approved' ? '✅ Approved' : '⏳ Pending'}
+                                    </span>
+                                </div>
+                            ))
                         )}
                         <button className="text-sm font-semibold text-primary hover:underline mt-2 w-full text-center p-2">View All →</button>
                     </div>
@@ -747,4 +502,3 @@ const ShoppingPage: React.FC = () => {
 };
 
 export default ShoppingPage;
-

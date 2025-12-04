@@ -1,224 +1,533 @@
+import axios from 'axios';
 import type { User, Bill, PaymentStatus } from '../types';
-import { Role, RoomStatus } from '../types';
+import { Role } from '../types';
 
-// Mock database of users
-const mockUsers: User[] = [
-  { id: '1', email: 'manager@test.com', name: 'Alice Manager', role: Role.Manager, roomStatus: RoomStatus.Approved, khataId: 'ROOM123' },
-  { id: '2', email: 'member@test.com', name: 'Bob Member', role: Role.Member, roomStatus: RoomStatus.Approved, khataId: 'ROOM122' },
-  { id: '3', email: 'priya@test.com', name: 'Priya Das', role: Role.Member, roomStatus: RoomStatus.Approved, khataId: 'ROOM123' },
-  { id: '4', email: 'ravi@test.com', name: 'Ravi Islam', role: Role.Member, roomStatus: RoomStatus.Approved, khataId: 'ROOM123' },
-  { id: '9', email: 'amit@test.com', name: 'Amit Hossain', role: Role.Member, roomStatus: RoomStatus.Approved, khataId: 'ROOM123' },
-  { id: '5', email: 'pending@test.com', name: 'Charlie Pending', role: Role.Member, roomStatus: RoomStatus.Pending },
-  { id: '6', email: 'noroom@test.com', name: 'David No-Room', role: Role.Member, roomStatus: RoomStatus.NoRoom },
-  { id: '7', email: 'manager.noroom@test.com', name: 'Eve Manager', role: Role.Manager, roomStatus: RoomStatus.NoRoom },
-  { id: '8', email: 'john@test.com', name: 'John Doe', role: Role.Member, roomStatus: RoomStatus.Approved, khataId: 'ROOM122' },
-];
+// Create axios instance
+const axiosInstance = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+    headers: {
+        'Content-Type': 'application/json',
+    }
+});
 
-const mockBills: Bill[] = [
-    // October Bills for ROOM123 (Manager Alice, Members: Priya, Ravi, Amit)
-    // Rent (individual bills) - Manager does not have one
-    { id: 'rent-oct-3', khataId: 'ROOM123', title: 'October Rent', category: 'Rent', totalAmount: 4500, dueDate: '2025-10-01', createdBy: '1', shares: [{ userId: '3', userName: 'Priya Das', amount: 4500, status: 'Overdue' }] },
-    { id: 'rent-oct-4', khataId: 'ROOM123', title: 'October Rent', category: 'Rent', totalAmount: 5000, dueDate: '2025-10-01', createdBy: '1', shares: [{ userId: '4', userName: 'Ravi Islam', amount: 5000, status: 'Paid' }] },
-    { id: 'rent-oct-9', khataId: 'ROOM123', title: 'October Rent', category: 'Rent', totalAmount: 5200, dueDate: '2025-10-01', createdBy: '1', shares: [{ userId: '9', userName: 'Amit Hossain', amount: 5200, status: 'Paid' }] },
-    
-    // Electricity (shared bill) - Split among 3 members
-    { id: 'elec-oct', khataId: 'ROOM123', title: 'October Electricity', category: 'Electricity', totalAmount: 1200, dueDate: '2025-10-15', createdBy: '1', description: 'Meter Reading: 1234 kWh. AC usage high this month.',
-      shares: [
-        { userId: '3', userName: 'Priya Das', amount: 400, status: 'Unpaid' },
-        { userId: '4', userName: 'Ravi Islam', amount: 400, status: 'Unpaid' },
-        { userId: '9', userName: 'Amit Hossain', amount: 400, status: 'Unpaid' },
-      ]},
-    
-    // Water (shared bill) - Split among 3 members
-    { id: 'water-oct', khataId: 'ROOM123', title: 'October Water', category: 'Water', totalAmount: 800, dueDate: '2025-10-12', createdBy: '1',
-      shares: [
-        { userId: '3', userName: 'Priya Das', amount: 267, status: 'Paid' },
-        { userId: '4', userName: 'Ravi Islam', amount: 266, status: 'Unpaid' },
-        { userId: '9', userName: 'Amit Hossain', amount: 267, status: 'Unpaid' },
-      ]},
-    
-    // Wi-Fi - Split among 3 members
-    { id: 'wifi-oct', khataId: 'ROOM123', title: 'October Wi-Fi', category: 'Wi-Fi', totalAmount: 1000, dueDate: '2025-10-10', createdBy: '1',
-      shares: [
-        { userId: '3', userName: 'Priya Das', amount: 333, status: 'Pending Approval' },
-        { userId: '4', userName: 'Ravi Islam', amount: 333, status: 'Paid' },
-        { userId: '9', userName: 'Amit Hossain', amount: 334, status: 'Unpaid' },
-      ]},
+// Add token to requests
+axiosInstance.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
 
-    // September Bills for ROOM123 - Split among 3 members
-    { id: 'elec-sep', khataId: 'ROOM123', title: 'September Electricity', category: 'Electricity', totalAmount: 1150, dueDate: '2025-09-15', createdBy: '1', shares: [
-        { userId: '3', userName: 'Priya Das', amount: 383, status: 'Paid' },
-        { userId: '4', userName: 'Ravi Islam', amount: 383, status: 'Paid' },
-        { userId: '9', userName: 'Amit Hossain', amount: 384, status: 'Paid' },
-    ]},
-    { id: 'water-sep', khataId: 'ROOM123', title: 'September Water', category: 'Water', totalAmount: 750, dueDate: '2025-09-12', createdBy: '1', shares: [
-        { userId: '3', userName: 'Priya Das', amount: 250, status: 'Paid' },
-        { userId: '4', userName: 'Ravi Islam', amount: 250, status: 'Paid' },
-        { userId: '9', userName: 'Amit Hossain', amount: 250, status: 'Paid' },
-    ]},
+// Handle token expiration (but not failed login/signup)
+axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        // Only redirect to landing page if it's a token expiration (not login/signup failure)
+        const isAuthEndpoint = error.config?.url?.includes('/auth/login') ||
+            error.config?.url?.includes('/auth/signup');
 
-    // Bills for ROOM122 (Bob and John)
-    { 
-      id: 'rent-oct-bob', 
-      khataId: 'ROOM122',
-      title: 'October Rent', 
-      category: 'Rent', 
-      totalAmount: 6000, 
-      dueDate: '2025-10-05', 
-      createdBy: 'some-manager-id', 
-      shares: [{ userId: '2', userName: 'Bob Member', amount: 6000, status: 'Overdue' }] 
-    },
-    { 
-      id: 'rent-oct-john', 
-      khataId: 'ROOM122',
-      title: 'October Rent', 
-      category: 'Rent', 
-      totalAmount: 6000, 
-      dueDate: '2025-10-05', 
-      createdBy: 'some-manager-id', 
-      shares: [{ userId: '8', userName: 'John Doe', amount: 6000, status: 'Paid' }] 
-    },
-    { 
-      id: 'elec-oct-room122', 
-      khataId: 'ROOM122',
-      title: 'October Electricity', 
-      category: 'Electricity', 
-      totalAmount: 900, 
-      dueDate: '2025-10-20', 
-      createdBy: 'some-manager-id',
-      shares: [
-        { userId: '2', userName: 'Bob Member', amount: 450, status: 'Unpaid' },
-        { userId: '8', userName: 'John Doe', amount: 450, status: 'Paid' },
-      ]
-    },
-    { 
-      id: 'wifi-oct-room122', 
-      khataId: 'ROOM122',
-      title: 'October Wi-Fi', 
-      category: 'Wi-Fi', 
-      totalAmount: 800, 
-      dueDate: '2025-10-10', 
-      createdBy: 'some-manager-id',
-      shares: [
-        { userId: '2', userName: 'Bob Member', amount: 400, status: 'Pending Approval' },
-        { userId: '8', userName: 'John Doe', amount: 400, status: 'Paid' },
-      ]
-    },
-     { 
-      id: 'water-sep-room122', 
-      khataId: 'ROOM122',
-      title: 'September Water', 
-      category: 'Water', 
-      totalAmount: 500, 
-      dueDate: '2025-09-18', 
-      createdBy: 'some-manager-id',
-      shares: [
-        { userId: '2', userName: 'Bob Member', amount: 250, status: 'Paid' },
-        { userId: '8', userName: 'John Doe', amount: 250, status: 'Paid' },
-      ]
-    },
-];
-
+        if (error.response?.status === 401 && !isAuthEndpoint) {
+            // Token expired or invalid - clear storage and redirect
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+        return Promise.reject(error);
+    }
+);
 
 const api = {
-  // FIX: Changed parameter types from a-zA-Z to string
-  login: (email: string, pass: string): Promise<User | null> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = mockUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (user) {
-          resolve(user);
-        } else {
-          resolve(null);
+    // Authentication
+    login: async (email: string, pass: string): Promise<User | null> => {
+        try {
+            const response = await axiosInstance.post('/auth/login', { email, password: pass });
+            const { token, user } = response.data;
+
+            // Store token
+            localStorage.setItem('token', token);
+
+            return user;
+        } catch (error: any) {
+            const message = error.response?.data?.message ||
+                (error.response?.data?.errors ? error.response.data.errors.map((e: any) => e.msg).join(', ') : 'Login failed');
+            console.error('Login error:', message);
+            throw new Error(message);
         }
-      }, 500);
-    });
-  },
+    },
 
-  // FIX: Changed parameter types from a-zA-Z to string
-  signup: (name: string, email: string, pass: string, role: Role): Promise<User | null> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const userExists = mockUsers.some((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (userExists) {
-          resolve(null);
-        } else {
-          const newUser: User = {
-            id: String(mockUsers.length + 1),
-            name,
-            email,
-            role,
-            roomStatus: RoomStatus.NoRoom,
-          };
-          mockUsers.push(newUser); 
-          resolve(newUser);
+    signup: async (name: string, email: string, pass: string, role: Role): Promise<User | null> => {
+        try {
+            const response = await axiosInstance.post('/auth/signup', {
+                name,
+                email,
+                password: pass,
+                role
+            });
+            const { token, user } = response.data;
+
+            // Store token
+            localStorage.setItem('token', token);
+
+            return user;
+        } catch (error: any) {
+            const message = error.response?.data?.message ||
+                (error.response?.data?.errors ? error.response.data.errors.map((e: any) => e.msg).join(', ') : 'Signup failed');
+            console.error('Signup error:', message);
+            throw new Error(message);
         }
-      }, 500);
-    });
-  },
-  
-  // FIX: Changed parameter type from a-zA-Z to string
-  getBillsForRoom: (roomId: string): Promise<Bill[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const roomBills = mockBills.filter(bill => bill.khataId === roomId);
-            resolve(JSON.parse(JSON.stringify(roomBills))); // Deep copy
-        }, 500);
-    });
-  },
+    },
 
-  updateBillShareStatus: (billId: string, userId: string, newStatus: PaymentStatus): Promise<Bill | null> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const billIndex = mockBills.findIndex(b => b.id === billId);
-        if (billIndex > -1) {
-          const bill = mockBills[billIndex];
-          const shareIndex = bill.shares.findIndex(s => s.userId === userId);
-          if (shareIndex > -1) {
-            bill.shares[shareIndex].status = newStatus;
-            mockBills[billIndex] = bill;
-            resolve(JSON.parse(JSON.stringify(bill))); // Return deep copy of updated bill
-          } else {
-            resolve(null); // Share not found
-          }
-        } else {
-          resolve(null); // Bill not found
+    getCurrentUser: async (): Promise<User | null> => {
+        try {
+            const response = await axiosInstance.get('/auth/me');
+            return response.data;
+        } catch (error) {
+            return null;
         }
-      }, 300);
-    });
-  },
+    },
 
-  getMembersForRoom: (roomId: string): Promise<User[]> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            const roomMembers = mockUsers.filter(user => user.khataId === roomId && user.role === Role.Member);
-            resolve(JSON.parse(JSON.stringify(roomMembers))); // Deep copy
-        }, 300);
-    });
-  },
+    // Room management
+    createRoom: async (name: string, khataId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.post('/rooms/create', { name, khataId });
+            return true;
+        } catch (error: any) {
+            console.error('Create room error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
 
-  getPendingApprovalsCount: (roomId: string): Promise<number> => {
-    // This is a mock. In a real app, this would query a database.
-    const mockPendingApprovals = {
-        billPayments: 3,
-        shopping: 1,
-        deposits: 1,
-        joinRequests: 0,
-        mealEntries: 1,
-    };
-    const total = Object.values(mockPendingApprovals).reduce((sum, count) => sum + count, 0);
-    return new Promise(resolve => setTimeout(() => resolve(total), 200));
-  },
+    joinRoom: async (khataId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.post('/rooms/join', { khataId });
+            return true;
+        } catch (error: any) {
+            console.error('Join room error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
 
-  getFundStatus: (roomId: string): Promise<{ balance: number }> => {
-      // Mock data from ShoppingPage
-    const mockFundStatus = {
-        totalDeposits: 12000,
-        totalShopping: 8460,
-        balance: 3540,
-    };
-    return new Promise(resolve => setTimeout(() => resolve({ balance: mockFundStatus.balance }), 200));
-  }
+    getMembersForRoom: async (roomId: string): Promise<User[]> => {
+        try {
+            const response = await axiosInstance.get(`/rooms/${roomId}/members`);
+            return response.data;
+        } catch (error) {
+            console.error('Get members error:', error);
+            return [];
+        }
+    },
+
+    getPendingApprovals: async (roomId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/rooms/${roomId}/pending`);
+            return response.data;
+        } catch (error) {
+            console.error('Get pending approvals error:', error);
+            return [];
+        }
+    },
+
+    approveMember: async (roomId: string, userId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/rooms/${roomId}/approve/${userId}`);
+            return true;
+        } catch (error) {
+            console.error('Approve member error:', error);
+            return false;
+        }
+    },
+
+    // Bills
+    getBillsForRoom: async (roomId: string): Promise<Bill[]> => {
+        try {
+            const response = await axiosInstance.get(`/bills/${roomId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get bills error:', error);
+            return [];
+        }
+    },
+
+    createBill: async (billData: any): Promise<boolean> => {
+        try {
+            await axiosInstance.post('/bills', billData);
+            return true;
+        } catch (error: any) {
+            console.error('Create bill error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
+
+    updateBillShareStatus: async (billId: string, userId: string, newStatus: PaymentStatus): Promise<Bill | null> => {
+        try {
+            const response = await axiosInstance.put(`/bills/${billId}/share/${userId}`, {
+                status: newStatus
+            });
+
+            // Fetch updated bill list
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.khataId) {
+                const bills = await api.getBillsForRoom(user.khataId);
+                const updatedBill = bills.find(b => b.id === billId);
+                return updatedBill || null;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('Update bill share status error:', error);
+            return null;
+        }
+    },
+
+    deleteBill: async (billId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.delete(`/bills/${billId}`);
+            return true;
+        } catch (error: any) {
+            console.error('Delete bill error:', error.response?.data?.message || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to delete bill');
+        }
+    },
+
+    updateBill: async (billId: string, billData: Partial<Bill>): Promise<Bill> => {
+        try {
+            const response = await axiosInstance.put(`/bills/${billId}`, billData);
+            return response.data.bill;
+        } catch (error: any) {
+            console.error('Update bill error:', error.response?.data?.message || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to update bill');
+        }
+    },
+
+    sendBillReminder: async (billId: string): Promise<number> => {
+        try {
+            const response = await axiosInstance.post(`/bills/${billId}/remind`);
+            return response.data.count;
+        } catch (error: any) {
+            console.error('Send bill reminder error:', error.response?.data?.message || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to send reminders');
+        }
+    },
+
+    getBillStats: async (roomId: string): Promise<any> => {
+        try {
+            const response = await axiosInstance.get(`/bills/${roomId}/stats`);
+            return response.data;
+        } catch (error) {
+            console.error('Get bill stats error:', error);
+            return {
+                totalUnpaid: 0,
+                totalPaid: 0,
+                totalOverdue: 0,
+                pendingApprovals: 0
+            };
+        }
+    },
+
+    getPendingApprovalsCount: async (roomId: string): Promise<number> => {
+        try {
+            const response = await axiosInstance.get(`/rooms/${roomId}/pending`);
+            return response.data.length || 0;
+        } catch (error) {
+            return 0;
+        }
+    },
+
+    getFundStatus: async (roomId: string): Promise<{ balance: number }> => {
+        // Mock data for now - can be implemented later
+        return { balance: 3540 };
+    },
+
+    // Menu
+    getMenu: async (khataId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/menu/${khataId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get menu error:', error);
+            return [];
+        }
+    },
+
+    saveMenu: async (khataId: string, items: any[], isPermanent: boolean = false): Promise<boolean> => {
+        try {
+            await axiosInstance.post(`/menu/${khataId}`, { items, isPermanent });
+            return true;
+        } catch (error: any) {
+            console.error('Save menu error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
+
+    updateMenuDay: async (khataId: string, day: string, mealData: { breakfast?: string; lunch?: string; dinner?: string }): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/menu/${khataId}/day/${day}`, mealData);
+            return true;
+        } catch (error: any) {
+            console.error('Update menu day error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
+
+    // Shopping
+    getShoppingMembers: async (khataId: string): Promise<{ id: string; name: string }[]> => {
+        try {
+            const response = await axiosInstance.get(`/shopping/${khataId}/members`);
+            return response.data;
+        } catch (error) {
+            console.error('Get shopping members error:', error);
+            return [];
+        }
+    },
+
+    getShoppingRoster: async (khataId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/shopping/${khataId}/roster`);
+            return response.data.items || [];
+        } catch (error) {
+            console.error('Get shopping roster error:', error);
+            return [];
+        }
+    },
+
+    saveShoppingRoster: async (khataId: string, items: any[]): Promise<boolean> => {
+        try {
+            await axiosInstance.post(`/shopping/${khataId}/roster`, { items });
+            return true;
+        } catch (error: any) {
+            console.error('Save shopping roster error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
+
+    getShoppingSummary: async (khataId: string): Promise<any> => {
+        try {
+            const response = await axiosInstance.get(`/shopping/${khataId}/summary`);
+            return response.data;
+        } catch (error) {
+            console.error('Get shopping summary error:', error);
+            return null;
+        }
+    },
+
+    // Meals
+    getMeals: async (khataId: string, startDate?: string, endDate?: string): Promise<any[]> => {
+        try {
+            const params: any = {};
+            if (startDate) params.startDate = startDate;
+            if (endDate) params.endDate = endDate;
+            const response = await axiosInstance.get(`/meals/${khataId}`, { params });
+            return response.data;
+        } catch (error) {
+            console.error('Get meals error:', error);
+            return [];
+        }
+    },
+
+    getUserMeals: async (khataId: string, userId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/meals/${khataId}/user/${userId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get user meals error:', error);
+            return [];
+        }
+    },
+
+    submitMeal: async (khataId: string, mealData: {
+        date: string;
+        breakfast?: number;
+        lunch?: number;
+        dinner?: number;
+        userId?: string;
+        userName?: string;
+    }): Promise<any> => {
+        try {
+            const response = await axiosInstance.post(`/meals/${khataId}`, mealData);
+            return response.data;
+        } catch (error: any) {
+            console.error('Submit meal error:', error.response?.data?.message || error.message);
+            throw error;
+        }
+    },
+
+    getMealSummary: async (khataId: string): Promise<any> => {
+        try {
+            const response = await axiosInstance.get(`/meals/${khataId}/summary`);
+            return response.data;
+        } catch (error) {
+            console.error('Get meal summary error:', error);
+            return null;
+        }
+    },
+
+    finalizeMeals: async (khataId: string, date: string): Promise<boolean> => {
+        try {
+            await axiosInstance.post(`/meals/${khataId}/finalize`, { date });
+            return true;
+        } catch (error: any) {
+            console.error('Finalize meals error:', error.response?.data?.message || error.message);
+            return false;
+        }
+    },
+
+    getFinalizationStatus: async (khataId: string, date: string): Promise<{ isFinalized: boolean; finalization?: any }> => {
+        try {
+            const response = await axiosInstance.get(`/meals/${khataId}/finalization/${date}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get finalization status error:', error);
+            return { isFinalized: false };
+        }
+    },
+
+    // Deposits
+    getDeposits: async (khataId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/deposits/${khataId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get deposits error:', error);
+            return [];
+        }
+    },
+
+    createDeposit: async (khataId: string, depositData: {
+        amount: number;
+        paymentMethod: string;
+        transactionId?: string;
+        screenshotUrl?: string;
+    }): Promise<any> => {
+        try {
+            const response = await axiosInstance.post(`/deposits/${khataId}`, depositData);
+            return response.data;
+        } catch (error: any) {
+            console.error('Create deposit error:', error.response?.data?.message || error.message);
+            throw error;
+        }
+    },
+
+    approveDeposit: async (khataId: string, depositId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/deposits/${khataId}/${depositId}/approve`);
+            return true;
+        } catch (error) {
+            console.error('Approve deposit error:', error);
+            return false;
+        }
+    },
+
+    rejectDeposit: async (khataId: string, depositId: string, reason?: string): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/deposits/${khataId}/${depositId}/reject`, { reason });
+            return true;
+        } catch (error) {
+            console.error('Reject deposit error:', error);
+            return false;
+        }
+    },
+
+    // Expenses
+    getExpenses: async (khataId: string): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/expenses/${khataId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get expenses error:', error);
+            return [];
+        }
+    },
+
+    createExpense: async (khataId: string, expenseData: {
+        amount: number;
+        items: string;
+        notes?: string;
+        receiptUrl?: string;
+    }): Promise<any> => {
+        try {
+            const response = await axiosInstance.post(`/expenses/${khataId}`, expenseData);
+            return response.data;
+        } catch (error: any) {
+            console.error('Create expense error:', error.response?.data?.message || error.message);
+            throw error;
+        }
+    },
+
+    approveExpense: async (khataId: string, expenseId: string): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/expenses/${khataId}/${expenseId}/approve`);
+            return true;
+        } catch (error) {
+            console.error('Approve expense error:', error);
+            return false;
+        }
+    },
+
+    rejectExpense: async (khataId: string, expenseId: string, reason?: string): Promise<boolean> => {
+        try {
+            await axiosInstance.put(`/expenses/${khataId}/${expenseId}/reject`, { reason });
+            return true;
+        } catch (error) {
+            console.error('Reject expense error:', error);
+            return false;
+        }
+    },
+
+    // Notifications
+    getNotifications: async (unreadOnly = false): Promise<any[]> => {
+        try {
+            const response = await axiosInstance.get(`/notifications?unreadOnly=${unreadOnly}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get notifications error:', error);
+            return [];
+        }
+    },
+
+    getUnreadCount: async (): Promise<number> => {
+        try {
+            const response = await axiosInstance.get('/notifications/unread-count');
+            return response.data.count;
+        } catch (error) {
+            return 0;
+        }
+    },
+
+    markNotificationRead: async (id: string | number): Promise<any> => {
+        try {
+            const response = await axiosInstance.put(`/notifications/${id}/mark-read`);
+            return response.data;
+        } catch (error) {
+            console.error('Mark read error:', error);
+            return null;
+        }
+    },
+
+    markAllNotificationsRead: async (): Promise<boolean> => {
+        try {
+            await axiosInstance.put('/notifications/mark-all-read');
+            return true;
+        } catch (error) {
+            console.error('Mark all read error:', error);
+            return false;
+        }
+    },
+
+    deleteNotification: async (id: string | number): Promise<boolean> => {
+        try {
+            await axiosInstance.delete(`/notifications/${id}`);
+            return true;
+        } catch (error) {
+            console.error('Delete notification error:', error);
+            return false;
+        }
+    }
 };
 
 export { api };

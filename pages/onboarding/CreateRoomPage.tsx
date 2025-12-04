@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { HouseIcon, SpinnerIcon, ClipboardIcon, CheckCircleIcon } from '../../components/Icons';
-import { RoomStatus } from '../../types';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { api } from '../../services/api';
 
 const CreateRoomPage: React.FC = () => {
     const [roomName, setRoomName] = useState('');
@@ -12,15 +12,29 @@ const CreateRoomPage: React.FC = () => {
     const { user, setUser, logout } = useAuth();
     const { addToast } = useNotifications();
 
-    const handleCreateRoom = (e: React.FormEvent) => {
+    const handleCreateRoom = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Mock API call
-        setTimeout(() => {
+
+        try {
+            // Generate a unique room code
             const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-            setGeneratedCode(code);
+
+            // Call API to create room
+            const success = await api.createRoom(roomName, code);
+
+            if (success) {
+                setGeneratedCode(code);
+                addToast({ type: 'success', title: 'Success!', message: 'Room created successfully.' });
+            } else {
+                addToast({ type: 'error', title: 'Error', message: 'Failed to create room. Please try again.' });
+            }
+        } catch (error) {
+            console.error('Create room error:', error);
+            addToast({ type: 'error', title: 'Error', message: 'Failed to create room. Please try again.' });
+        } finally {
             setLoading(false);
-        }, 1000);
+        }
     };
 
     const handleCopy = () => {
@@ -31,19 +45,22 @@ const CreateRoomPage: React.FC = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const finishOnboarding = () => {
+    const finishOnboarding = async () => {
         if (user) {
-            const updatedUser = { ...user, roomStatus: RoomStatus.Approved, khataId: 'ROOM' + generatedCode };
-            setUser(updatedUser);
-            localStorage.setItem('user', JSON.stringify(updatedUser));
+            // Fetch updated user from API
+            const updatedUser = await api.getCurrentUser();
+            if (updatedUser) {
+                setUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+            }
         }
     };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
             <div className="text-center mb-8">
-                 <h1 className="text-4xl font-bold text-primary-600">BillKhata</h1>
-                 <p className="text-slate-500 dark:text-slate-400">Welcome, {user?.name}!</p>
+                <h1 className="text-4xl font-bold text-primary-600">BillKhata</h1>
+                <p className="text-slate-500 dark:text-slate-400">Welcome, {user?.name}!</p>
             </div>
 
             <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-xl shadow-lg p-8 text-center">
@@ -75,8 +92,8 @@ const CreateRoomPage: React.FC = () => {
                         <CheckCircleIcon className="w-16 h-16 mx-auto text-green-500" />
                         <h2 className="text-2xl font-bold text-slate-800 dark:text-white mt-4">Room Created!</h2>
                         <p className="text-slate-500 dark:text-slate-400 mt-2 mb-6">Share this code with your members so they can join.</p>
-                        
-                        <div 
+
+                        <div
                             className="w-full flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-700 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 cursor-pointer"
                             onClick={handleCopy}
                         >
@@ -88,12 +105,12 @@ const CreateRoomPage: React.FC = () => {
                             onClick={finishOnboarding}
                             className="w-full mt-6 px-4 py-3 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 transition-colors"
                         >
-                           Go to Dashboard
+                            Go to Dashboard
                         </button>
                     </>
                 )}
             </div>
-             <button onClick={logout} className="mt-8 text-sm text-slate-500 hover:underline">
+            <button onClick={logout} className="mt-8 text-sm text-slate-500 hover:underline">
                 Logout
             </button>
         </div>
