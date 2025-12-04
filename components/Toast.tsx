@@ -8,9 +8,30 @@ interface ToastProps {
 }
 
 const toastConfig = {
-    success: { icon: CheckCircleSolidIcon, color: 'bg-success', text: 'text-white' },
-    warning: { icon: ExclamationTriangleIcon, color: 'bg-warning', text: 'text-white' },
-    error: { icon: XCircleIcon, color: 'bg-danger', text: 'text-white' },
+    success: {
+        icon: CheckCircleSolidIcon,
+        bgColor: 'bg-green-100 dark:bg-green-800',
+        borderColor: 'border-l-4 border-green-600 dark:border-green-400',
+        iconColor: 'text-green-700 dark:text-green-300',
+        titleColor: 'text-green-900 dark:text-green-100',
+        messageColor: 'text-green-800 dark:text-green-200'
+    },
+    warning: {
+        icon: ExclamationTriangleIcon,
+        bgColor: 'bg-yellow-100 dark:bg-yellow-800',
+        borderColor: 'border-l-4 border-yellow-600 dark:border-yellow-400',
+        iconColor: 'text-yellow-700 dark:text-yellow-300',
+        titleColor: 'text-yellow-900 dark:text-yellow-100',
+        messageColor: 'text-yellow-800 dark:text-yellow-200'
+    },
+    error: {
+        icon: XCircleIcon,
+        bgColor: 'bg-red-100 dark:bg-red-800',
+        borderColor: 'border-l-4 border-red-600 dark:border-red-400',
+        iconColor: 'text-red-700 dark:text-red-300',
+        titleColor: 'text-red-900 dark:text-red-100',
+        messageColor: 'text-red-800 dark:text-red-200'
+    },
 };
 
 const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
@@ -32,21 +53,21 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
     };
 
     return (
-        <div 
-            className={`w-full max-w-sm rounded-lg shadow-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-300 ease-in-out ${config.color} ${visible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}
+        <div
+            className={`w-full max-w-md rounded-xl shadow-2xl pointer-events-auto overflow-hidden transition-all duration-300 ease-in-out ${config.bgColor} ${config.borderColor} ${visible ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'}`}
         >
-            <div className="p-4">
-                <div className="flex items-start">
+            <div className="p-5">
+                <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                        <Icon className={`h-6 w-6 ${config.text}`} aria-hidden="true" />
+                        <Icon className={`h-7 w-7 ${config.iconColor}`} aria-hidden="true" />
                     </div>
-                    <div className="ml-3 w-0 flex-1 pt-0.5">
-                        <p className={`text-sm font-bold font-sans ${config.text}`}>{title}</p>
-                        <p className={`mt-1 text-sm ${config.text}`}>{message}</p>
+                    <div className="flex-1 min-w-0">
+                        <p className={`text-base font-bold font-sans ${config.titleColor}`}>{title}</p>
+                        <p className={`mt-1.5 text-sm leading-relaxed ${config.messageColor}`}>{message}</p>
                     </div>
-                    <div className="ml-4 flex-shrink-0 flex">
+                    <div className="flex-shrink-0">
                         <button
-                            className="inline-flex rounded-md text-white/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white"
+                            className={`inline-flex rounded-lg p-1.5 ${config.iconColor} hover:bg-black/5 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${config.iconColor.replace('text-', 'focus:ring-')}`}
                             onClick={handleClose}
                         >
                             <span className="sr-only">Close</span>

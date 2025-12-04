@@ -1,5 +1,7 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { Page } from './AuthContext';
+import { useAuth } from './AuthContext';
+import { api } from '../services/api';
 
 export type ToastType = 'success' | 'warning' | 'error';
 export interface Toast {
@@ -9,9 +11,9 @@ export interface Toast {
     message: string;
 }
 
-export type NotificationType = 'bill' | 'payment' | 'meal' | 'room';
+export type NotificationType = 'bill' | 'payment' | 'meal' | 'room' | 'deposit' | 'expense';
 export interface Notification {
-    id: number;
+    id: string; // Changed from number to string for MongoDB _id
     type: NotificationType;
     title: string;
     message: string;
@@ -19,19 +21,8 @@ export interface Notification {
     timestamp: string;
     read: boolean;
     link?: Page;
+    createdAt?: string;
 }
-
-// MOCK DATA
-const mockNotifications: Notification[] = [
-    { id: 1, type: 'bill', title: 'New Bill Assigned', message: 'Electricity bill (₹300) - Due: Oct 15', actionText: 'View Bill', timestamp: '2 hours ago', read: false, link: 'bills-electricity' },
-    { id: 2, type: 'payment', title: 'Payment Approved', message: 'Your Rent payment (₹5,000) has been approved by the manager.', timestamp: '5 hours ago', read: true, link: 'bills-rent' },
-    { id: 3, type: 'meal', title: 'Meal Reminder', message: "Don't forget to log today's meals.", actionText: 'Log Now', timestamp: '6 hours ago', read: false, link: 'meals' },
-    { id: 4, type: 'room', title: 'Member Joined', message: 'Amit Hossain has joined the room.', timestamp: '1 day ago', read: true, link: 'members' },
-    { id: 5, type: 'payment', title: 'Payment Reminder', message: 'Your Electricity bill is due in 3 days.', timestamp: '2 days ago', read: false, link: 'bills-electricity' },
-    { id: 6, type: 'bill', title: 'Bill Overdue', message: 'Your Rent bill is overdue by 7 days.', timestamp: '7 days ago', read: false, link: 'bills-rent' },
-    { id: 7, type: 'meal', title: 'Shopping Approved', message: 'Your shopping expense of ₹850 has been approved.', timestamp: '8 days ago', read: false, link: 'shopping' },
-];
-
 
 interface NotificationContextType {
     toasts: Toast[];
@@ -39,17 +30,55 @@ interface NotificationContextType {
     notifications: Notification[];
     unreadCount: number;
     markAllAsRead: () => void;
-    markAsRead: (id: number) => void;
+    markAsRead: (id: string) => void;
+    refreshNotifications: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
     const [toasts, setToasts] = useState<Toast[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
 
-    const unreadCount = notifications.filter(n => !n.read).length;
-    
+    const fetchNotifications = async () => {
+        if (user) {
+            try {
+                const data = await api.getNotifications();
+                // Transform data if needed (e.g., format timestamp)
+                const formattedNotifications = data.map((n: any) => ({
+                    id: n._id,
+                    type: n.type,
+                    title: n.title,
+                    message: n.message,
+                    actionText: n.actionText,
+                    timestamp: new Date(n.createdAt).toLocaleString(), // Simple formatting
+                    read: n.read,
+                    link: n.link,
+                    createdAt: n.createdAt
+                }));
+                setNotifications(formattedNotifications);
+
+                const count = await api.getUnreadCount();
+                setUnreadCount(count);
+            } catch (error) {
+                console.error("Failed to fetch notifications", error);
+            }
+        } else {
+            setNotifications([]);
+            setUnreadCount(0);
+        }
+    };
+
+    useEffect(() => {
+        fetchNotifications();
+
+        // Optional: Poll for new notifications every minute
+        const interval = setInterval(fetchNotifications, 60000);
+        return () => clearInterval(interval);
+    }, [user]);
+
     const addToast = (toast: Omit<Toast, 'id'>) => {
         const newToast = { ...toast, id: Date.now() };
         setToasts(prev => [...prev, newToast]);
@@ -58,16 +87,34 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
         }, 5000); // Auto-dismiss after 5 seconds
     };
 
-    const markAllAsRead = () => {
+    const markAllAsRead = async () => {
+        // Optimistic update
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+
+        await api.markAllNotificationsRead();
+        fetchNotifications(); // Sync with server
     };
 
-    const markAsRead = (id: number) => {
+    const markAsRead = async (id: string) => {
+        // Optimistic update
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
+        await api.markNotificationRead(id);
+        fetchNotifications(); // Sync with server
     };
 
     return (
-        <NotificationContext.Provider value={{ toasts, addToast, notifications, unreadCount, markAllAsRead, markAsRead }}>
+        <NotificationContext.Provider value={{
+            toasts,
+            addToast,
+            notifications,
+            unreadCount,
+            markAllAsRead,
+            markAsRead,
+            refreshNotifications: fetchNotifications
+        }}>
             {children}
         </NotificationContext.Provider>
     );

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BillKhata</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@700&family=Rubik:wght@600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: { '50': '#fbf5ff', '100': '#f7ebff', '200': '#f2daff', '300': '#e9c9ff', '400': '#e2a0ff', '500': '#d17eff', '600': '#b951f7', '700': '#a333e0', '800': '#8826b9', '900': '#702199', '950': '#4a0f6b' },
+              success: { '50': '#f0fff7', '100': '#dfffee', '200': '#b7ffd8', '300': '#8fffc4', '400': '#64ffb0', '500': '#41fa9c', '600': '#26e083', '700': '#1db068', '800': '#1a8d54', '900': '#187346', '950': '#0b4127' },
+              danger: { '50': '#fff5f7', '100': '#ffeaef', '200': '#ffdde5', '300': '#ffc1cf', '400': '#ffa5b9', '500': '#ff809d', '600': '#f75b7f', '700': '#e04266', '800': '#b93250', '900': '#992d45', '950': '#571322' },
+              warning: { '50': '#fafff0', '100': '#f5ffd9', '200': '#e8ffb7', '300': '#dcf09a', '400': '#c9e07b', '500': '#b6d05d', '600': '#99b347', '700': '#7a8f39', '800': '#637332', '900': '#515e2d', '950': '#2e3617' },
+              slate: { '50': '#f0f4f5', '100': '#e0e9eb', '200': '#c2d3d7', '300': '#a3bdc3', '400': '#85a6af', '500': '#66909b', '600': '#4c7784', '700': '#335c67', '800': '#294a52', '900': '#243e45', '950': '#17292e' },
+              'light-cyan': { '50': '#f3fcfd', '100': '#e7f9fb', '200': '#c4f5fc', '300': '#a1f1fa', '400': '#7decf8', '500': '#58e8f6', '600': '#3bd3e4', '700': '#32b0c0', '800': '#2f8d9b', '900': '#2d7481', '950': '#194953' }
+            },
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+              body: ['Inter', 'sans-serif'],
+              numeric: ['Rubik', 'sans-serif'],
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              slideInRight: {
+                '0%': { transform: 'translateX(100%)', opacity: '0' },
+                '100%': { transform: 'translateX(0)', opacity: '1' },
+              },
+              slideOutRight: {
+                '0%': { transform: 'translateX(0)', opacity: '1' },
+                '100%': { transform: 'translateX(100%)', opacity: '0' },
+              },
+              slideInUp: {
+                '0%': { transform: 'translateY(50px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              scaleIn: {
+                '0%': { transform: 'scale(0.95)', opacity: '0' },
+                '100%': { transform: 'scale(1)', opacity: '1' },
+              },
+              shimmer: {
+                '0%': { backgroundPosition: '-1000px 0' },
+                '100%': { backgroundPosition: '1000px 0' },
+              },
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'slide-in-right': 'slideInRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+              'slide-out-right': 'slideOutRight 0.3s ease-in forwards',
+              'slide-in-up': 'slideInUp 0.4s ease-out forwards',
+              'scale-in': 'scaleIn 0.3s ease-out forwards',
+              'shimmer': 'shimmer 2s infinite linear',
+            },
+            backgroundImage: {
+              'gradient-success': 'linear-gradient(to right, #1db068, #187346)',
+              'shimmer-gradient': 'linear-gradient(to right, transparent 0%, rgba(255,255,255,0.2) 50%, transparent 100%)',
+            },
+            transitionProperty: {
+              'transform-shadow': 'transform, box-shadow',
+              'max-height': 'max-height',
+            }
+          }
+        }
+      }
+    </script>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-CLzHsCk7.js"></script>
+</head>
+  <body class="bg-light-cyan-50 text-slate-700 dark:bg-slate-900 dark:text-slate-300 font-body">
+    <div id="root"></div>
+  </body>
+</html>

@@ -10,6 +10,7 @@ import {
 } from './Icons';
 import { Role } from '../types';
 import NotificationsPanel from './NotificationsPanel';
+import { usePendingCount } from '../hooks/usePendingCount';
 
 interface NavLinkProps {
   page: Page;
@@ -86,8 +87,7 @@ const BillsNavGroup: React.FC = () => {
 
 const SidebarContent: React.FC = () => {
     const { user, logout } = useAuth();
-    // Mock count for pending tasks
-    const pendingTasksCount = 5;
+    const pendingTasksCount = usePendingCount(user?.khataId, user?.role === Role.Manager);
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-slate-800/50 backdrop-blur-sm">

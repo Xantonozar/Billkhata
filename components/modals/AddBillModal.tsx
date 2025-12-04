@@ -2,18 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Bill, BillShare, Role } from '../../types';
 import { XIcon, CameraIcon } from '../Icons';
 import { useNotifications } from '../../contexts/NotificationContext';
-// FIX: Import useAuth to access user information like khataId.
 import { useAuth } from '../../contexts/AuthContext';
-
-// Consistent mock data of all users. Logic will filter this list.
-const mockUsers = [
-    { id: '1', name: 'Alice Manager', role: Role.Manager },
-    { id: '3', name: 'Priya Das', role: Role.Member },
-    { id: '4', name: 'Ravi Islam', role: Role.Member },
-    { id: '9', name: 'Amit Hossain', role: Role.Member },
-    { id: '2', name: 'Bob Member', role: Role.Member },
-    { id: '8', name: 'John Doe', role: Role.Member },
-];
+import { api } from '../../services/api';
 
 interface AddBillModalProps {
     onClose: () => void;
@@ -30,24 +20,46 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
     const [totalAmount, setTotalAmount] = useState<number | ''>('');
     const [description, setDescription] = useState('');
     const [splitType, setSplitType] = useState<'equally' | 'custom'>('equally');
-    
-    // Display only members for selection
-    const membersToDisplay = useMemo(() => mockUsers.filter(u => u.role === Role.Member), []);
-    
-    const [selectedMembers, setSelectedMembers] = useState<string[]>(membersToDisplay.map(m => m.id));
+    const [members, setMembers] = useState<Array<{ id: string; name: string; email: string }>>([]);
+    const [loadingMembers, setLoadingMembers] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+
+    const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
     const [customAmounts, setCustomAmounts] = useState<Record<string, number>>({});
     const { addToast } = useNotifications();
+
+    // Fetch members from database
+    useEffect(() => {
+        const fetchMembers = async () => {
+            if (!user?.khataId) return;
+
+            setLoadingMembers(true);
+            try {
+                const roomMembers = await api.getMembersForRoom(user.khataId);
+                setMembers(roomMembers);
+                // Select all members by default
+                setSelectedMembers(roomMembers.map(m => m.id));
+            } catch (error) {
+                console.error('Error fetching members:', error);
+                addToast({ type: 'error', title: 'Error', message: 'Failed to load room members' });
+            } finally {
+                setLoadingMembers(false);
+            }
+        };
+
+        fetchMembers();
+    }, [user?.khataId]);
 
     const getInitialDateForMonth = (monthString?: string) => {
         if (monthString) {
             try {
                 const [monthStr, yearStr] = monthString.split(' ');
                 const year = parseInt(yearStr, 10);
-                const monthIndex = new Date(Date.parse(monthStr +" 1, 2012")).getMonth();
+                const monthIndex = new Date(Date.parse(monthStr + " 1, 2012")).getMonth();
                 const defaultDate = new Date(year, monthIndex, 1);
                 return defaultDate.toISOString().split('T')[0];
             } catch (e) {
-                 return new Date().toISOString().split('T')[0];
+                return new Date().toISOString().split('T')[0];
             }
         }
         return new Date().toISOString().split('T')[0];
@@ -63,7 +75,7 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
         const [monthStr, yearStr] = newMonth.split(' ');
         const year = parseInt(yearStr, 10);
         const monthIndex = new Date(Date.parse(monthStr + " 1, 2012")).getMonth();
-        
+
         const newDate = new Date(year, monthIndex, 1);
         setDueDate(newDate.toISOString().split('T')[0]);
     };
@@ -86,57 +98,90 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
 
     const isCustomTotalValid = Math.abs(customTotal - (totalAmount || 0)) < 0.01;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (totalAmount === '' || totalAmount <= 0) {
             addToast({ type: 'error', title: 'Invalid Amount', message: 'Please enter a valid total amount.' });
             return;
         }
         if (selectedMembers.length === 0) {
-             addToast({ type: 'error', title: 'No Members Selected', message: 'Please select at least one member to split the bill.' });
+            addToast({ type: 'error', title: 'No Members Selected', message: 'Please select at least one member to split the bill.' });
             return;
         }
         if (splitType === 'custom' && !isCustomTotalValid) {
             addToast({ type: 'error', title: 'Invalid Amounts', message: 'Custom split amounts must add up to the total bill amount.' });
             return;
         }
-        if (!user) {
+        if (!user || !user.khataId) {
             addToast({ type: 'error', title: 'Error', message: 'You must be logged in to add a bill.' });
             return;
         }
 
-        const newShares: BillShare[] = selectedMembers.map(memberId => {
-            const member = membersToDisplay.find(m => m.id === memberId);
-            const amount = splitType === 'equally'
-                ? totalAmount / selectedMembers.length
-                : customAmounts[memberId] || 0;
-            
-            return {
-                userId: memberId,
-                userName: member!.name,
-                amount: parseFloat(amount.toFixed(2)),
-                status: 'Unpaid',
+        setSubmitting(true);
+
+        try {
+            const newShares: BillShare[] = selectedMembers.map(memberId => {
+                const member = members.find(m => m.id === memberId);
+                const amount = splitType === 'equally'
+                    ? totalAmount / selectedMembers.length
+                    : customAmounts[memberId] || 0;
+
+                return {
+                    userId: memberId,
+                    userName: member!.name,
+                    amount: parseFloat(amount.toFixed(2)),
+                    status: 'Unpaid',
+                };
+            });
+
+            const billData = {
+                title,
+                category,
+                totalAmount,
+                dueDate,
+                description,
+                shares: newShares,
             };
-        });
 
-        const newBill: Bill = {
-            id: `bill-${Date.now()}`,
-            // FIX: The 'khataId' property was missing, causing a type error.
-            khataId: user.khataId!,
-            title,
-            category,
-            totalAmount,
-            dueDate,
-            description,
-            shares: newShares,
-            // FIX: Replaced mock manager ID with the actual user's ID.
-            createdBy: user.id,
-        };
+            // Save to database
+            const success = await api.createBill(billData);
 
-        onBillAdded(newBill);
-        onClose();
+            if (success) {
+                addToast({
+                    type: 'success',
+                    title: 'Bill Created',
+                    message: `${title} has been successfully created.`
+                });
+
+                // Fetch the updated bills list
+                if (user.khataId) {
+                    const updatedBills = await api.getBillsForRoom(user.khataId);
+                    // Find the newly created bill (it should be the most recent one with matching title)
+                    const newBill = updatedBills.find(b => b.title === title && b.category === category);
+                    if (newBill) {
+                        onBillAdded(newBill);
+                    }
+                }
+                onClose();
+            } else {
+                addToast({
+                    type: 'error',
+                    title: 'Error',
+                    message: 'Failed to create bill. Please try again.'
+                });
+            }
+        } catch (error) {
+            console.error('Error creating bill:', error);
+            addToast({
+                type: 'error',
+                title: 'Error',
+                message: 'Failed to create bill. Please try again.'
+            });
+        } finally {
+            setSubmitting(false);
+        }
     };
-    
+
     const renderMemberSplits = () => {
         if (selectedMembers.length === 0) {
             return <p className="text-sm text-slate-500 text-center">Select members to split the bill.</p>;
@@ -150,7 +195,7 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
         return (
             <div className="space-y-2">
                 {selectedMembers.map(memberId => {
-                    const member = membersToDisplay.find(m => m.id === memberId);
+                    const member = members.find(m => m.id === memberId);
                     return (
                         <div key={memberId} className="flex items-center justify-between gap-2">
                             <span className="text-sm">{member?.name}</span>
@@ -168,7 +213,7 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
                         </div>
                     );
                 })}
-                 <div className={`mt-2 pt-2 border-t dark:border-slate-600 flex justify-between font-semibold ${isCustomTotalValid ? 'text-success-600' : 'text-danger-600'}`}>
+                <div className={`mt-2 pt-2 border-t dark:border-slate-600 flex justify-between font-semibold ${isCustomTotalValid ? 'text-success-600' : 'text-danger-600'}`}>
                     <span>Total Custom:</span>
                     <span>৳{customTotal.toFixed(2)}</span>
                 </div>
@@ -179,21 +224,21 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 animate-fade-in p-4" onClick={onClose}>
             <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg animate-scale-in" onClick={e => e.stopPropagation()}>
-                 <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center">
+                <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center">
                     <h2 className="text-xl font-bold font-sans text-slate-900 dark:text-white">Add New Bill</h2>
-                    <button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><XIcon className="w-5 h-5"/></button>
+                    <button type="button" onClick={onClose} className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700"><XIcon className="w-5 h-5" /></button>
                 </div>
-                
+
                 <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4 text-sm">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Title</label>
-                            <input type="text" placeholder="e.g., October Electricity" value={title} onChange={e => setTitle(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required/>
+                            <input type="text" placeholder="e.g., October Electricity" value={title} onChange={e => setTitle(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required />
                         </div>
                         <div>
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Category</label>
                             <select value={category} onChange={e => setCategory(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required>
-                                 {['Electricity', 'Water', 'Gas', 'Wi-Fi', 'Maid', 'Others'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                {['Rent', 'Electricity', 'Water', 'Gas', 'Wi-Fi', 'Maid', 'Others'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
                             </select>
                         </div>
                         {availableMonths && availableMonths.length > 0 && (
@@ -206,62 +251,65 @@ const AddBillModal: React.FC<AddBillModalProps> = ({ onClose, onBillAdded, prese
                         )}
                         <div>
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Total Amount</label>
-                            <input type="number" step="0.01" value={totalAmount} onChange={e => setTotalAmount(parseFloat(e.target.value) || '')} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required/>
+                            <input type="number" step="0.01" value={totalAmount} onChange={e => setTotalAmount(parseFloat(e.target.value) || '')} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required />
                         </div>
-                         <div>
+                        <div>
                             <label className="font-semibold text-slate-700 dark:text-slate-300">Due Date</label>
-                            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required/>
+                            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" required />
                         </div>
                     </div>
-                     <div>
-                         <label className="font-semibold text-slate-700 dark:text-slate-300">Description (Optional)</label>
-                         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" />
-                    </div>
-                     <div>
-                        <label className="font-semibold text-slate-700 dark:text-slate-300">Receipt Image (Optional)</label>
-                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 dark:border-slate-600 border-dashed rounded-md">
-                            <div className="space-y-1 text-center">
-                                <CameraIcon className="mx-auto h-12 w-12 text-slate-400" />
-                                <div className="flex text-sm text-slate-600 dark:text-slate-400">
-                                    <label htmlFor="file-upload" className="relative cursor-pointer bg-white dark:bg-slate-800 rounded-md font-medium text-primary-600 hover:text-primary-500">
-                                        <span>Upload a file</span>
-                                        <input id="file-upload" name="file-upload" type="file" className="sr-only" />
-                                    </label>
-                                    <p className="pl-1">or drag and drop</p>
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-500">PNG, JPG, GIF up to 10MB</p>
-                            </div>
-                        </div>
+                    <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300">Description (Optional)</label>
+                        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full mt-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 border-2 border-transparent rounded-lg focus:outline-none focus:border-primary-500" />
                     </div>
                     <div className="border-t pt-4 dark:border-slate-600">
                         <h3 className="font-bold text-slate-800 dark:text-white">Split Bill With</h3>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                             {membersToDisplay.map(member => (
-                                <label key={member.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer">
-                                    <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => handleMemberToggle(member.id)} className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-                                    <span>{member.name}</span>
-                                </label>
-                            ))}
-                        </div>
+                        {loadingMembers ? (
+                            <p className="text-sm text-slate-500 text-center py-4">Loading members...</p>
+                        ) : members.length === 0 ? (
+                            <p className="text-sm text-slate-500 text-center py-4">No members found in this room</p>
+                        ) : (
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                                {members.map(member => (
+                                    <label key={member.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer">
+                                        <input type="checkbox" checked={selectedMembers.includes(member.id)} onChange={() => handleMemberToggle(member.id)} className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                        <span>{member.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     {selectedMembers.length > 0 && (
-                         <div className="border-t pt-4 dark:border-slate-600">
-                             <h3 className="font-bold text-slate-800 dark:text-white">Split Method</h3>
-                             <div className="mt-2 flex gap-2 p-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                 <button type="button" onClick={() => setSplitType('equally')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md ${splitType === 'equally' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>Split Equally</button>
-                                 <button type="button" onClick={() => setSplitType('custom')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md ${splitType === 'custom' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>Custom Amount</button>
-                             </div>
-                             <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                        <div className="border-t pt-4 dark:border-slate-600">
+                            <h3 className="font-bold text-slate-800 dark:text-white">Split Method</h3>
+                            <div className="mt-2 flex gap-2 p-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                                <button type="button" onClick={() => setSplitType('equally')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md ${splitType === 'equally' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>Split Equally</button>
+                                <button type="button" onClick={() => setSplitType('custom')} className={`flex-1 py-1.5 text-sm font-semibold rounded-md ${splitType === 'custom' ? 'bg-white dark:bg-slate-600 shadow' : ''}`}>Custom Amount</button>
+                            </div>
+                            <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                                 {renderMemberSplits()}
                             </div>
-                         </div>
+                        </div>
                     )}
 
                 </div>
 
                 <div className="p-6 bg-slate-50 dark:bg-slate-700/50 rounded-b-xl flex justify-end gap-3">
-                    <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">Cancel</button>
-                    <button type="submit" className="px-4 py-2 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600">Add Bill</button>
+                    <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-200 dark:bg-slate-600 font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500" disabled={submitting}>Cancel</button>
+                    <button
+                        type="submit"
+                        className="px-4 py-2 bg-primary-500 text-white font-semibold rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        disabled={submitting || loadingMembers}
+                    >
+                        {submitting ? (
+                            <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Creating...
+                            </>
+                        ) : (
+                            'Add Bill'
+                        )}
+                    </button>
                 </div>
             </form>
         </div>
