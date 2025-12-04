@@ -1,6 +1,6 @@
 export enum Role {
-  Manager = 'Manager',
-  Member = 'Member',
+    Manager = 'Manager',
+    Member = 'Member',
 }
 
 export enum RoomStatus {
@@ -10,12 +10,12 @@ export enum RoomStatus {
 }
 
 export interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: Role;
-  roomStatus: RoomStatus;
-  khataId?: string;
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    roomStatus: RoomStatus;
+    khataId?: string;
 }
 
 export type PaymentStatus = 'Unpaid' | 'Pending Approval' | 'Paid' | 'Overdue';
@@ -28,16 +28,18 @@ export interface BillShare {
 }
 
 export interface Bill {
-  id: string;
-  khataId: string;
-  title: string;
-  totalAmount: number;
-  dueDate: string;
-  category: string;
-  description?: string;
-  imageUrl?: string;
-  createdBy: string;
-  shares: BillShare[];
+    id: string;
+    khataId: string;
+    title: string;
+    totalAmount: number;
+    dueDate: string;
+    category: string;
+    description?: string;
+    imageUrl?: string;
+    createdBy: string;
+    shares: BillShare[];
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 
@@ -53,7 +55,14 @@ export interface JoinRequest {
 }
 
 export interface TodaysMenu {
-  breakfast: string;
-  lunch: string;
-  dinner: string;
+    breakfast: string;
+    lunch: string;
+    dinner: string;
+}
+
+export interface Menu {
+    day: string;
+    breakfast: string;
+    lunch: string;
+    dinner: string;
 }

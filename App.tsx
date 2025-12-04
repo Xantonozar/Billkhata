@@ -37,7 +37,7 @@ const AppContent: React.FC = () => {
     }
 
     if (user.roomStatus === RoomStatus.Pending) {
-        return <PendingApprovalPage />;
+      return <PendingApprovalPage />;
     }
 
     // User is approved and in a room
