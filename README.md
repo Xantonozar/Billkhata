@@ -1,127 +1,137 @@
-# BillKhata - Bill Management System
+# BillKhata - Expense Management Application
 
-A full-stack application for managing shared bills and expenses with role-based authentication.
+A full-stack expense management application for roommates to track bills, meals, shopping, and more.
 
-## Features
-
-- **Authentication**: JWT-based secure authentication  
-- **Role-Based Access**: Manager and Member roles with different permissions
-- **Room Management**: Create and join shared expense rooms
-- **Bill Tracking**: Create, view, and manage bills with payment status tracking
-- **MongoDB Database**: Persistent data storage in MongoDB BILL database
-
-## Tech Stack
-
-### Backend
-- Node.js + Express
-- MongoDB + Mongoose
-- JWT Authentication
-- bcryptjs for password hashing
-
-### Frontend  
-- React 19
-- TypeScript
-- Vite
-- Axios for API calls
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 - Node.js (v18 or higher)
-- MongoDB Atlas account (or local MongoDB)
+- MongoDB (running locally or connection string)
 
 ### Installation
 
-1. **Install Backend Dependencies**
-```bash
-cd server
-npm install
-```
+1. **Install root dependencies:**
+   ```bash
+   npm install
+   ```
 
-2. **Install Frontend Dependencies**
-```bash
-npm install
-```
+2. **Install server dependencies:**
+   ```bash
+   cd server
+   npm install
+   cd ..
+   ```
+
+3. **Set up environment variables:**
+   
+   Create `.env` in the root directory:
+   ```
+   VITE_API_URL=http://localhost:5000/api
+   ```
+   
+   Create `server/.env`:
+   ```
+   PORT=5000
+   MONGODB_URI=your_mongodb_connection_string
+   JWT_SECRET=your_jwt_secret
+   ```
 
 ### Running the Application
 
-1. **Start the Backend Server** (Terminal 1)
+**Development mode - Run both frontend and backend together (recommended):**
+```bash
+npm run dev:all
+```
+
+This will start:
+- Frontend (Vite): http://localhost:3000
+- Backend (Express): http://localhost:5000
+
+**Or run them separately in development:**
+
+Frontend only:
+```bash
+npm run dev
+```
+
+Backend only:
 ```bash
 cd server
 npm run dev
 ```
-The server will run on `http://localhost:5000`
 
-2. **Start the Frontend** (Terminal 2)
+### Build for Production
+
+**Build the frontend:**
 ```bash
-npm run dev
-```
-The frontend will run on `http://localhost:5173`
-
-## Usage
-
-### For Managers:
-1. Sign up with Manager role
-2. Create a new room with a unique name
-3. Share the 6-digit room code with members
-4. Approve member join requests
-5. Create and manage bills
-
-### For Members:
-1. Sign up with Member role
-2. Join a room using the 6-digit code
-3. Wait for manager approval
-4. View bills and update payment status
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/signup` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user (protected)
-
-### Rooms
-- `POST /api/rooms/create` - Create room (Manager only)
-- `POST /api/rooms/join` - Request to join room
-- `GET /api/rooms/:roomId/members` - Get room members
-- `GET /api/rooms/:roomId/pending` - Get pending requests (Manager only)
-- `PUT /api/rooms/:roomId/approve/:userId` - Approve member (Manager only)
-
-### Bills
-- `GET /api/bills/:roomId` - Get all bills for room
-- `POST /api/bills` - Create bill (Manager only)
-- `PUT /api/bills/:billId/share/:userId` - Update payment status
-- `GET /api/bills/:roomId/stats` - Get bill statistics
-
-## Environment Variables
-
-### Backend (`server/.env`)
-```
-MONGODB_URI=mongodb+srv://meal:BlUntsfgPGpR2SkW@mymongo.rhcri.mongodb.net/BILL?retryWrites=true&w=majority&appName=MyMongo
-JWT_SECRET=billkhata-super-secret-jwt-key-change-in-production-2024
-PORT=5000
-NODE_ENV=development
+npm run build:all
 ```
 
-### Frontend (`.env`)
+This creates an optimized production build in the `dist` folder.
+
+**Run in production mode:**
+```bash
+npm run start:all
 ```
-VITE_API_URL=http://localhost:5000/api
+
+This will start:
+- Frontend (Preview server): http://localhost:4173
+- Backend (Production): http://localhost:5000
+
+**Or run them separately in production:**
+
+Frontend only (serves built files):
+```bash
+npm run preview
 ```
 
-## Database Structure
+Backend only:
+```bash
+cd server
+npm start
+```
 
-### Collections:
-- **users**: User accounts with authentication
-- **rooms**: Room/Khata information with members
-- **bills**: Bills with shares and payment tracking
+## Features
 
-## Security Features
+- 👥 User authentication (Manager/Member roles)
+- 🏠 Room management
+- 💰 Bill tracking and splitting
+- 🍽️ Meal management
+- 🛒 Shopping list
+- 📊 Reports and analytics
+- 🔔 Real-time notifications
+- 🌓 Dark mode support
 
-- Passwords hashed with bcrypt
-- JWT tokens for stateless authentication
-- Protected routes with authentication middleware
-- Role-based access control
-- CORS configuration
+## Tech Stack
+
+**Frontend:**
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS (via inline styles)
+
+**Backend:**
+- Node.js
+- Express
+- MongoDB + Mongoose
+- JWT Authentication
+- bcryptjs
+
+## Project Structure
+
+```
+billkhata/
+├── components/          # React components
+├── contexts/           # React contexts (Auth, Theme, Notifications)
+├── pages/              # Page components
+├── services/           # API service layer
+├── server/             # Backend server
+│   ├── models/        # Mongoose models
+│   ├── routes/        # Express routes
+│   └── middleware/    # Auth middleware
+├── hooks/             # Custom React hooks
+└── types.ts           # TypeScript type definitions
+```
 
 ## License
 

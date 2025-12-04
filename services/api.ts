@@ -166,7 +166,7 @@ const api = {
 
     updateBillShareStatus: async (billId: string, userId: string, newStatus: PaymentStatus): Promise<Bill | null> => {
         try {
-            const response = await axiosInstance.put(`/bills/${billId}/share/${userId}`, {
+            await axiosInstance.put(`/bills/${billId}/share/${userId}`, {
                 status: newStatus
             });
 
@@ -239,7 +239,7 @@ const api = {
         }
     },
 
-    getFundStatus: async (roomId: string): Promise<{ balance: number }> => {
+    getFundStatus: async (_roomId: string): Promise<{ balance: number }> => {
         // Mock data for now - can be implemented later
         return { balance: 3540 };
     },
